@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>CV Generator App</title>
+</head>
+<body>
+    {% if user.is_authenticated %}
+        Welcome, {{ user.first_name }}! (<a href="{% url 'account_logout' %}">Logout</a>)
+    {% else %}
+        <a href="{% url 'account_login' %}">Login</a>
+    {% endif %}
+    <hr>
+    {% block content %}
+    {% endblock %}
+</body>
+</html>
