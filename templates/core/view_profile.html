@@ -1,0 +1,90 @@
+<!-- core/templates/core/view_profile.html -->
+
+{% extends "base.html" %}
+{% load custom_filters %}
+
+{% block content %}
+<h2>Your Profile</h2>
+
+<!-- Basic Information -->
+<p><strong>Name:</strong> {{ profile.name }}</p>
+<p><strong>Phone:</strong> {{ profile.phone }}</p>
+<p><strong>LinkedIn:</strong> <a href="{{ profile.linkedin_link }}" target="_blank">{{ profile.linkedin_link }}</a></p>
+<p><strong>Summary:</strong> {{ profile.summary }}</p>
+
+<!-- Skills -->
+<p><strong>Skills:</strong></p>
+<ul>
+    {% for skill in profile.skills|split:"," %}
+        {% if skill %}
+            <li>{{ skill }}</li>
+        {% endif %}
+    {% endfor %}
+</ul>
+
+<!-- Publications -->
+<p><strong>Publications:</strong></p>
+<ul>
+    {% for publication in profile.publications|split:"," %}
+        {% if publication %}
+            <li>{{ publication }}</li>
+        {% endif %}
+    {% endfor %}
+</ul>
+
+<!-- Projects -->
+<p><strong>Projects:</strong></p>
+<ul>
+    {% for project in profile.projects|split:"," %}
+        {% if project %}
+            <li>{{ project }}</li>
+        {% endif %}
+    {% endfor %}
+</ul>
+
+<!-- Interests -->
+<p><strong>Interests:</strong></p>
+<ul>
+    {% for interest in profile.interests|split:"," %}
+        {% if interest %}
+            <li>{{ interest }}</li>
+        {% endif %}
+    {% endfor %}
+</ul>
+
+<hr>
+
+<!-- Education Section -->
+<h3>Education</h3>
+<ul>
+    {% for edu in educations %}
+        <li>
+            <strong>{{ edu.education_level }}</strong> at <strong>{{ edu.university }}</strong><br>
+            {{ edu.start_date|date:"F Y" }}{% if edu.end_date %} - {{ edu.end_date|date:"F Y" }}{% else %} - Present{% endif %}<br>
+            <em>Specialization:</em> {{ edu.specialization }}<br>
+            <em>Thesis:</em> {{ edu.thesis }}<br>
+            <em>Relevant Subjects:</em> {{ edu.relevant_subjects }}
+        </li>
+    {% empty %}
+        <li>No education entries yet.</li>
+    {% endfor %}
+</ul>
+<a href="{% url 'add_education' %}" class="btn btn-primary">Add Education</a>
+
+<hr>
+
+<!-- Experience Section -->
+<h3>Experience</h3>
+<ul>
+    {% for exp in experiences %}
+        <li>
+            <strong>{{ exp.title }}</strong> at <strong>{{ exp.company }}</strong>, {{ exp.city }}<br>
+            {{ exp.start_date|date:"F Y" }}{% if exp.end_date %} - {{ exp.end_date|date:"F Y" }}{% else %} - Present{% endif %}<br>
+            {{ exp.description|linebreaks }}
+        </li>
+    {% empty %}
+        <li>No experience entries yet.</li>
+    {% endfor %}
+</ul>
+<a href="{% url 'add_experience' %}" class="btn btn-primary">Add Experience</a>
+{% endblock %}
