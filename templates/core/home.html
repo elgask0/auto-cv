@@ -1,0 +1,13 @@
+<!-- core/templates/core/home.html -->
+
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Welcome to the CV Generator App</h1>
+{% if user.is_authenticated %}
+    <p>Hello, {{ user.first_name }}!</p>
+    <p><a href="{% url 'user_profile' %}">Go to your profile</a></p>
+{% else %}
+    <p>Please <a href="{% url 'account_login' %}">log in</a> to continue.</p>
+{% endif %}
+{% endblock %}

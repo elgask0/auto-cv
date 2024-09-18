@@ -1,3 +1,5 @@
+# core/views.py
+
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 from .forms import UserProfileForm
@@ -14,7 +16,7 @@ def user_profile(request):
             return redirect('home')  # Redirect to home or another appropriate page
     else:
         form = UserProfileForm(instance=profile)
-    return render(request, 'user_profile.html', {'form': form})
+    return render(request, 'core/user_profile.html', {'form': form})
 
 def home(request):
-    return render(request, 'home.html')
+    return render(request, 'core/home.html')
