@@ -1,0 +1,34 @@
+<!-- templates/core/document_list.html -->
+
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Your Generated Documents</h2>
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Type</th>
+            <th>Job Description</th>
+            <th>Generated On</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for gen in generations %}
+        <tr>
+            <td>{{ gen.get_generation_type_display }}</td>
+            <td>{{ gen.job_description|truncatechars:50 }}</td>
+            <td>{{ gen.created_at|date:"Y-m-d H:i" }}</td>
+            <td>
+                <a href="{% url 'render_latex' gen.id %}" class="btn btn-info btn-sm">View</a>
+                <a href="{% url 'download_pdf' gen.id %}" class="btn btn-success btn-sm">Download PDF</a>
+            </td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="4">No documents generated yet.</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

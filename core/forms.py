@@ -66,3 +66,26 @@ class ExperienceForm(forms.ModelForm):
 
         if end_date and end_date < start_date:
             raise forms.ValidationError("End date cannot be earlier than start date.")
+
+class GenerationForm(forms.Form):
+    GENERATION_TYPE_CHOICES = [
+        ('cv', 'Curriculum Vitae'),
+        ('cover_letter', 'Cover Letter'),
+    ]
+    
+    job_description = forms.CharField(
+        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 5}),
+        label='Job Description',
+        help_text='Enter the job description for which you are applying.'
+    )
+    
+    generate_cv = forms.BooleanField(
+        required=False,
+        initial=True,
+        label='Generate CV'
+    )
+    
+    generate_cover_letter = forms.BooleanField(
+        required=False,
+        label='Generate Cover Letter'
+    )

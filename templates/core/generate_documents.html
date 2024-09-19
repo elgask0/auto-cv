@@ -1,0 +1,24 @@
+<!-- templates/core/generate_documents.html -->
+
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Generate Your Documents</h2>
+<form method="post">
+    {% csrf_token %}
+    <div class="mb-3">
+        {{ form.job_description.label_tag }}
+        {{ form.job_description }}
+        <small class="form-text text-muted">{{ form.job_description.help_text }}</small>
+    </div>
+    <div class="form-check">
+        {{ form.generate_cv }}
+        {{ form.generate_cv.label_tag }}
+    </div>
+    <div class="form-check">
+        {{ form.generate_cover_letter }}
+        {{ form.generate_cover_letter.label_tag }}
+    </div>
+    <button type="submit" class="btn btn-primary mt-3">Generate</button>
+</form>
+{% endblock %}

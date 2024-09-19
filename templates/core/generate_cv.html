@@ -1,0 +1,10 @@
+<!-- core/templates/core/generate_cv.html -->
+
+{% extends "base.html" %}
+{% load custom_filters %}
+
+{% block content %}
+<h2>Your Generated CV</h2>
+<pre>{{ cv_text }}</pre>
+<a href="{% url 'download_cv' %}" class="btn btn-success">Download CV as PDF</a>
+{% endblock %}

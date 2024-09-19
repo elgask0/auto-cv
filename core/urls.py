@@ -8,5 +8,8 @@ urlpatterns = [
     path('edit-profile/', views.edit_profile, name='edit_profile'),
     path('add-education/', views.add_education, name='add_education'),
     path('add-experience/', views.add_experience, name='add_experience'),
-    # Future paths for adding publications, projects, interests
+    path('generate-documents/', views.generate_documents, name='generate_documents'),
+    path('documents/', views.document_list, name='document_list'),
+    path('render-latex/<int:generation_id>/', views.render_latex, name='render_latex'),
+    path('download-pdf/<int:generation_id>/', views.download_pdf, name='download_pdf'),
 ]
