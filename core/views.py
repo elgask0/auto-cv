@@ -1,6 +1,6 @@
 # core/views.py
 
-import openai
+from openai import OpenAI
 import json
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
@@ -13,7 +13,13 @@ from django.http import HttpResponse
 import subprocess
 import tempfile
 import os
+import base64
 
+import logging
+logger = logging.getLogger(__name__)
+
+# Initialize the OpenAI client with the API key from settings
+client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
 @login_required
 def view_profile(request):
@@ -64,7 +70,9 @@ def add_experience(request):
         form = ExperienceForm()
     return render(request, 'core/add_experience.html', {'form': form})
 
+import logging
 
+logger = logging.getLogger(__name__)
 
 @login_required
 def generate_documents(request):
@@ -86,66 +94,80 @@ def generate_documents(request):
                 return render(request, 'core/generate_documents.html', {'form': form})
             
             generated_documents = []
+            client = OpenAI(api_key=settings.OPENAI_API_KEY)  # Initialize OpenAI client
+            
             for gen_type in selected_generations:
-                # Prepare the prompt based on the type                
-                prompt = f"""
-                            Generate a professional {'Curriculum Vitae' if gen_type == 'cv' else 'Cover Letter'} in LaTeX format for the following individual based on the job description.
-
-                            Job Description:
-                            {job_description}
-
-                            User Information:
-                            Name: {request.user.userprofile.name}
-                            Phone: {request.user.userprofile.phone}
-                            LinkedIn: {request.user.userprofile.linkedin_link}
-                            Summary: {request.user.userprofile.summary}
-                            Skills: {request.user.userprofile.skills}
-                            Publications: {request.user.userprofile.publications}
-                            Projects: {request.user.userprofile.projects}
-                            Interests: {request.user.userprofile.interests}
-
-                            Please return the LaTeX code enclosed within a JSON object with the key "latex_code".
-                            Example:
-                            {{
-                                "latex_code": "Your LaTeX code here"
-                            }}
-                            """
-
-                # Call OpenAI API
-                openai.api_key = settings.OPENAI_API_KEY
+                # Prepare the prompt based on the type
+                if gen_type == 'cv':
+                    prompt = (
+                        f"Generate a professional Curriculum Vitae in LaTeX format for the following individual based on the job description.\n\n"
+                        f"Job Description:\n{job_description}\n\n"
+                        f"User Information:\n"
+                        f"Name: {request.user.userprofile.name}\n"
+                        f"Phone: {request.user.userprofile.phone}\n"
+                        f"LinkedIn: {request.user.userprofile.linkedin_link}\n"
+                        f"Summary: {request.user.userprofile.summary}\n"
+                        f"Skills: {request.user.userprofile.skills}\n"
+                        f"Publications: {request.user.userprofile.publications}\n"
+                        f"Projects: {request.user.userprofile.projects}\n"
+                        f"Interests: {request.user.userprofile.interests}\n\n"
+                        f"Please return the LaTeX code enclosed within a JSON object with the key \"latex_code\".\n"
+                        f"Example:\n{{\n    \"latex_code\": \"Your LaTeX code here\"\n}}"
+                    )
+                elif gen_type == 'cover_letter':
+                    prompt = (
+                        f"Generate a professional Cover Letter in LaTeX format for the following individual based on the job description.\n\n"
+                        f"Job Description:\n{job_description}\n\n"
+                        f"User Information:\n"
+                        f"Name: {request.user.userprofile.name}\n"
+                        f"Phone: {request.user.userprofile.phone}\n"
+                        f"LinkedIn: {request.user.userprofile.linkedin_link}\n"
+                        f"Summary: {request.user.userprofile.summary}\n"
+                        f"Skills: {request.user.userprofile.skills}\n"
+                        f"Publications: {request.user.userprofile.publications}\n"
+                        f"Projects: {request.user.userprofile.projects}\n"
+                        f"Interests: {request.user.userprofile.interests}\n\n"
+                        f"Please return the LaTeX code enclosed within a JSON object with the key \"latex_code\".\n"
+                        f"Example:\n{{\n    \"latex_code\": \"Your LaTeX code here\"\n}}"
+                    )
+                
                 try:
-                    response = openai.Completion.create(
-                        engine="text-davinci-003",
-                        prompt=prompt,
-                        max_tokens=2000,
-                        temperature=0.7,
+                    # Call the OpenAI API to generate the JSON output
+                    response = client.chat.completions.create(
+                        model="gpt-4",
+                        messages=[
+                            {"role": "system", "content": "You are a helpful assistant designed to output JSON."},
+                            {"role": "user", "content": prompt}
+                        ],
+                        max_tokens=1000,
+                        temperature=0.8
                     )
                     
-                    # Assume the response is JSON with LaTeX parts
-                    # For consistency, we expect OpenAI to return JSON
-                    # Example:
-                    # {
-                    #     "latex_code": "..."
-                    # }
-                    # So we need to parse it
-                    response_text = response.choices[0].text.strip()
-                    json_output = json.loads(response_text)
+                    # Extract the JSON output from the response
+                    json_output = response.choices[0].message.content.strip()
+                    
+                    # Parse the JSON string into a Python dictionary
+                    json_data = json.loads(json_output)
                     
                     # Save the generation to the database
                     generation = Generation.objects.create(
                         user=request.user,
                         job_description=job_description,
                         generation_type=gen_type,
-                        json_output=json_output,
+                        json_output=json_data,
                     )
                     
                     generated_documents.append(generation)
+                
+                except json.JSONDecodeError as json_err:
+                    form.add_error(None, f"JSON decode error for {gen_type}: {str(json_err)}")
+                    return render(request, 'core/generate_documents.html', {'form': form})
                 
                 except Exception as e:
                     form.add_error(None, f"Error generating {gen_type}: {str(e)}")
                     return render(request, 'core/generate_documents.html', {'form': form})
             
-            # Redirect to the list of generated documents or display them
+            # Redirect to the list of generated documents after successful generation
             return redirect('document_list')
     
     else:
@@ -160,36 +182,77 @@ def document_list(request):
 
 @login_required
 def render_latex(request, generation_id):
+    logger.debug(f"Rendering LaTeX for Generation ID: {generation_id}")
     generation = get_object_or_404(Generation, id=generation_id, user=request.user)
     
     latex_code = generation.json_output.get('latex_code', '')
+    logger.debug(f"Retrieved LaTeX code (length: {len(latex_code)} characters).")
+    
+    if not latex_code:
+        logger.error(f"No LaTeX code found for Generation ID: {generation_id}")
+        return HttpResponse("No LaTeX code found for this document.", status=400)
+    
+    # Define the full path to pdflatex
+    pdflatex_path = "/Library/TeX/texbin/pdflatex"
+    
+    # Check if pdflatex exists
+    if not os.path.exists(pdflatex_path):
+        logger.error("pdflatex executable not found.")
+        return HttpResponse(
+            "pdflatex executable not found. Please ensure that LaTeX is installed correctly.",
+            status=500
+        )
     
     # Render LaTeX to PDF using a temporary file
     with tempfile.TemporaryDirectory() as temp_dir:
+        logger.debug(f"Created temporary directory at {temp_dir}")
         tex_file_path = os.path.join(temp_dir, 'document.tex')
         pdf_file_path = os.path.join(temp_dir, 'document.pdf')
         
         # Write LaTeX code to .tex file
         with open(tex_file_path, 'w') as tex_file:
             tex_file.write(latex_code)
+        logger.debug(f"Wrote LaTeX code to {tex_file_path}")
         
         # Compile LaTeX to PDF using pdflatex
         try:
-            subprocess.run(['pdflatex', tex_file_path], cwd=temp_dir, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            logger.debug("Starting pdflatex subprocess.")
+            result = subprocess.run(
+                [pdflatex_path, '-interaction=nonstopmode', tex_file_path],
+                cwd=temp_dir,
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                timeout=30  # Add a timeout to prevent hanging indefinitely
+            )
+            logger.debug("pdflatex subprocess completed successfully.")
+        except subprocess.TimeoutExpired:
+            logger.error("pdflatex subprocess timed out.")
+            return HttpResponse("LaTeX compilation timed out.", status=500)
         except subprocess.CalledProcessError as e:
-            return HttpResponse(f"Error compiling LaTeX: {e.stderr.decode('utf-8')}")
+            error_message = e.stderr.decode('utf-8')
+            logger.error(f"Error compiling LaTeX: {error_message}")
+            return HttpResponse(f"Error compiling LaTeX: {error_message}", status=500)
+        except Exception as e:
+            logger.error(f"Unexpected error during LaTeX compilation: {str(e)}")
+            return HttpResponse(f"Unexpected error during LaTeX compilation: {str(e)}", status=500)
         
         # Read the generated PDF
+        if not os.path.exists(pdf_file_path):
+            logger.error("PDF file was not created.")
+            return HttpResponse("PDF file was not created.", status=500)
+        
         with open(pdf_file_path, 'rb') as pdf_file:
             pdf_content = pdf_file.read()
+        logger.debug("Read compiled PDF content.")
     
-    # Render the LaTeX code on the web (as raw text or using a LaTeX renderer)
-    # For simplicity, we'll display it as raw LaTeX code
-    # To render it beautifully, consider integrating a LaTeX rendering library or converting to HTML
+    # Encode PDF content to base64 for embedding in HTML
+    pdf_base64 = base64.b64encode(pdf_content).decode('utf-8')
     
+    # Render the LaTeX code and PDF preview on the web
     return render(request, 'core/render_latex.html', {
         'latex_code': latex_code,
-        'pdf_content': pdf_content,
+        'pdf_content': pdf_base64,
         'generation': generation,
     })
 

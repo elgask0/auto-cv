@@ -42,16 +42,11 @@ class Experience(models.Model):
     def __str__(self):
         return f"{self.title} at {self.company}"
 class Generation(models.Model):
-    GENERATION_TYPE_CHOICES = [
-        ('cv', 'Curriculum Vitae'),
-        ('cover_letter', 'Cover Letter'),
-    ]
-    
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='generations')
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
     job_description = models.TextField()
-    generation_type = models.CharField(max_length=20, choices=GENERATION_TYPE_CHOICES)
+    generation_type = models.CharField(max_length=50)
     json_output = models.JSONField()
     created_at = models.DateTimeField(auto_now_add=True)
-    
+
     def __str__(self):
-        return f"{self.get_generation_type_display()} by {self.user.username} on {self.created_at.strftime('%Y-%m-%d')}"
+        return f"{self.generation_type.title()} for {self.user.username}"
