@@ -9,10 +9,10 @@ class UserProfile(models.Model):
     phone = models.CharField(max_length=20, blank=True)
     linkedin_link = models.URLField(blank=True)
     summary = models.TextField(blank=True)
-    skills = models.TextField(blank=True, help_text="Enter skills separated by commas or new lines.")
-    publications = models.TextField(blank=True, help_text="Enter publications separated by commas or new lines.")
-    projects = models.TextField(blank=True, help_text="Enter projects separated by commas or new lines.")
-    interests = models.TextField(blank=True, help_text="Enter interests separated by commas or new lines.")
+    skills = models.TextField(blank=True, help_text="Enter skills separated by ; or new lines.")
+    publications = models.TextField(blank=True, help_text="Enter publications separated by ; or new lines.")
+    projects = models.TextField(blank=True, help_text="Enter projects separated by ; or new lines.")
+    interests = models.TextField(blank=True, help_text="Enter interests separated by ; or new lines.")
 
     def __str__(self):
         return self.name

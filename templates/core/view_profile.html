@@ -15,7 +15,7 @@
 <!-- Skills -->
 <p><strong>Skills:</strong></p>
 <ul>
-    {% for skill in profile.skills|split:"," %}
+    {% for skill in profile.skills|split:";" %}
         {% if skill %}
             <li>{{ skill }}</li>
         {% endif %}
@@ -25,7 +25,7 @@
 <!-- Publications -->
 <p><strong>Publications:</strong></p>
 <ul>
-    {% for publication in profile.publications|split:"," %}
+    {% for publication in profile.publications|split:";" %}
         {% if publication %}
             <li>{{ publication }}</li>
         {% endif %}
@@ -35,7 +35,7 @@
 <!-- Projects -->
 <p><strong>Projects:</strong></p>
 <ul>
-    {% for project in profile.projects|split:"," %}
+    {% for project in profile.projects|split:";" %}
         {% if project %}
             <li>{{ project }}</li>
         {% endif %}
@@ -45,7 +45,7 @@
 <!-- Interests -->
 <p><strong>Interests:</strong></p>
 <ul>
-    {% for interest in profile.interests|split:"," %}
+    {% for interest in profile.interests|split:";" %}
         {% if interest %}
             <li>{{ interest }}</li>
         {% endif %}

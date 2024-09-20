@@ -1,21 +1,32 @@
 # core/views.py
-
+import shutil
 from openai import OpenAI
 import json
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
-from .forms import UserProfileForm, EducationForm, ExperienceForm
-from .models import UserProfile, Education, Experience
+from .forms import UserProfileForm, EducationForm, ExperienceForm, GenerationForm
+from .models import UserProfile, Education, Experience, Generation
+from .prompts import generate_cv_prompt, generate_cover_letter_prompt
+from .utils import (
+    escape_latex_special_chars,
+    format_user_experience,
+    format_user_education,
+    format_user_list_field,
+    user_info_to_prompt_format,
+    LatexOutput,  # Import the function schema,
+    clean_latex
+)
+from .templates import cv_template, cover_letter_template
 from django.conf import settings
-from .forms import GenerationForm
-from .models import Generation
 from django.http import HttpResponse
 import subprocess
 import tempfile
 import os
 import base64
-
+from pydantic import ValidationError
 import logging
+
+# Initialize logging
 logger = logging.getLogger(__name__)
 
 # Initialize the OpenAI client with the API key from settings
@@ -70,9 +81,8 @@ def add_experience(request):
         form = ExperienceForm()
     return render(request, 'core/add_experience.html', {'form': form})
 
-import logging
 
-logger = logging.getLogger(__name__)
+
 
 @login_required
 def generate_documents(request):
@@ -83,93 +93,81 @@ def generate_documents(request):
             generate_cv = form.cleaned_data['generate_cv']
             generate_cover_letter = form.cleaned_data['generate_cover_letter']
             
+            # Escape the job description
+            escaped_job_description = escape_latex_special_chars(job_description)
+            
+            user_profile = request.user.userprofile
+
+            # Retrieve educations and experiences
+            educations = user_profile.educations.all()
+            experiences = user_profile.experiences.all()
+
+            # Prepare user info
+            user_info = {
+                'name': escape_latex_special_chars(user_profile.name),
+                'email': escape_latex_special_chars(request.user.email),
+                'phone': escape_latex_special_chars(user_profile.phone),
+                'education': format_user_education(educations),
+                'experience': format_user_experience(experiences),
+                'skills': format_user_list_field(user_profile.skills),
+                'interests': format_user_list_field(user_profile.interests),
+                'projects': format_user_list_field(user_profile.projects),
+                'publications': format_user_list_field(user_profile.publications),
+            }
+
+            # Convert user_info to a formatted string for the prompt
+            user_info_str = user_info_to_prompt_format(user_info)
+
             selected_generations = []
             if generate_cv:
                 selected_generations.append('cv')
             if generate_cover_letter:
                 selected_generations.append('cover_letter')
-            
+
             if not selected_generations:
                 form.add_error(None, "Please select at least one document to generate.")
                 return render(request, 'core/generate_documents.html', {'form': form})
-            
-            generated_documents = []
-            client = OpenAI(api_key=settings.OPENAI_API_KEY)  # Initialize OpenAI client
-            
+
             for gen_type in selected_generations:
-                # Prepare the prompt based on the type
                 if gen_type == 'cv':
-                    prompt = (
-                        f"Generate a professional Curriculum Vitae in LaTeX format for the following individual based on the job description.\n\n"
-                        f"Job Description:\n{job_description}\n\n"
-                        f"User Information:\n"
-                        f"Name: {request.user.userprofile.name}\n"
-                        f"Phone: {request.user.userprofile.phone}\n"
-                        f"LinkedIn: {request.user.userprofile.linkedin_link}\n"
-                        f"Summary: {request.user.userprofile.summary}\n"
-                        f"Skills: {request.user.userprofile.skills}\n"
-                        f"Publications: {request.user.userprofile.publications}\n"
-                        f"Projects: {request.user.userprofile.projects}\n"
-                        f"Interests: {request.user.userprofile.interests}\n\n"
-                        f"Please return the LaTeX code enclosed within a JSON object with the key \"latex_code\".\n"
-                        f"Example:\n{{\n    \"latex_code\": \"Your LaTeX code here\"\n}}"
-                    )
+                    template = cv_template
+                    prompt = generate_cv_prompt(user_info_str, escaped_job_description, template)
                 elif gen_type == 'cover_letter':
-                    prompt = (
-                        f"Generate a professional Cover Letter in LaTeX format for the following individual based on the job description.\n\n"
-                        f"Job Description:\n{job_description}\n\n"
-                        f"User Information:\n"
-                        f"Name: {request.user.userprofile.name}\n"
-                        f"Phone: {request.user.userprofile.phone}\n"
-                        f"LinkedIn: {request.user.userprofile.linkedin_link}\n"
-                        f"Summary: {request.user.userprofile.summary}\n"
-                        f"Skills: {request.user.userprofile.skills}\n"
-                        f"Publications: {request.user.userprofile.publications}\n"
-                        f"Projects: {request.user.userprofile.projects}\n"
-                        f"Interests: {request.user.userprofile.interests}\n\n"
-                        f"Please return the LaTeX code enclosed within a JSON object with the key \"latex_code\".\n"
-                        f"Example:\n{{\n    \"latex_code\": \"Your LaTeX code here\"\n}}"
-                    )
+                    template = cover_letter_template
+                    prompt = generate_cover_letter_prompt(user_info_str, escaped_job_description, template)
                 
                 try:
-                    # Call the OpenAI API to generate the JSON output
-                    response = client.chat.completions.create(
-                        model="gpt-4",
+                    response = client.beta.chat.completions.parse(
+                        model="gpt-4o-2024-08-06",
                         messages=[
-                            {"role": "system", "content": "You are a helpful assistant designed to output JSON."},
+                            {"role": "system", "content": "You are a helpful assistant designed to output LaTeX code in a structured format."},
                             {"role": "user", "content": prompt}
                         ],
-                        max_tokens=1000,
-                        temperature=0.8
+                        response_format=LatexOutput,
+                        max_tokens=5000,
+                        temperature=0.7
                     )
                     
-                    # Extract the JSON output from the response
-                    json_output = response.choices[0].message.content.strip()
+                    # Extract the parsed response using the Pydantic model
+                    latex_output = response.choices[0].message.parsed
                     
-                    # Parse the JSON string into a Python dictionary
-                    json_data = json.loads(json_output)
-                    
-                    # Save the generation to the database
-                    generation = Generation.objects.create(
+                    # Save the generation
+                    Generation.objects.create(
                         user=request.user,
                         job_description=job_description,
                         generation_type=gen_type,
-                        json_output=json_data,
+                        json_output=latex_output.dict(),  # Convert Pydantic model to dictionary
                     )
-                    
-                    generated_documents.append(generation)
-                
-                except json.JSONDecodeError as json_err:
-                    form.add_error(None, f"JSON decode error for {gen_type}: {str(json_err)}")
+                except ValidationError as ve:
+                    logger.error(f"Pydantic validation error for {gen_type}: {ve}")
+                    form.add_error(None, f"Error validating JSON output for {gen_type}. Please try again.")
                     return render(request, 'core/generate_documents.html', {'form': form})
-                
                 except Exception as e:
-                    form.add_error(None, f"Error generating {gen_type}: {str(e)}")
+                    logger.error(f"Error generating {gen_type}: {e}")
+                    form.add_error(None, f"Error generating {gen_type}: {e}")
                     return render(request, 'core/generate_documents.html', {'form': form})
             
-            # Redirect to the list of generated documents after successful generation
             return redirect('document_list')
-    
     else:
         form = GenerationForm(initial={'generate_cv': True})
     
@@ -182,39 +180,77 @@ def document_list(request):
 
 @login_required
 def render_latex(request, generation_id):
+    """
+    Renders the LaTeX code from the Generation model into a PDF and returns it.
+
+    This view retrieves LaTeX code stored as a JSON string in the Generation model,
+    cleans and formats it appropriately, compiles it using pdflatex, and returns
+    the resulting PDF to the user.
+
+    Parameters:
+    - request: The HTTP request object.
+    - generation_id (int): The ID of the Generation object containing LaTeX code.
+
+    Returns:
+    - HttpResponse: A response containing the compiled PDF or an error message.
+    """
     logger.debug(f"Rendering LaTeX for Generation ID: {generation_id}")
+
+    # Step 1: Retrieve the Generation object
     generation = get_object_or_404(Generation, id=generation_id, user=request.user)
-    
-    latex_code = generation.json_output.get('latex_code', '')
-    logger.debug(f"Retrieved LaTeX code (length: {len(latex_code)} characters).")
-    
-    if not latex_code:
+
+    # Step 2: Retrieve the LaTeX code from the JSON output
+    latex_code_raw = generation.json_output.get('latex_code', '')
+    logger.debug(f"Retrieved LaTeX code (length: {len(latex_code_raw)} characters).")
+
+    if not latex_code_raw:
         logger.error(f"No LaTeX code found for Generation ID: {generation_id}")
         return HttpResponse("No LaTeX code found for this document.", status=400)
-    
-    # Define the full path to pdflatex
-    pdflatex_path = "/Library/TeX/texbin/pdflatex"
-    
-    # Check if pdflatex exists
-    if not os.path.exists(pdflatex_path):
-        logger.error("pdflatex executable not found.")
+
+    # Step 3: Clean the LaTeX code
+    try:
+        latex_code_clean = clean_latex(latex_code_raw)
+        logger.debug("Successfully cleaned LaTeX code.")
+    except ValueError as ve:
+        logger.error(f"LaTeX cleaning failed: {ve}")
+        return HttpResponse(f"LaTeX cleaning failed: {ve}", status=400)
+    except Exception as e:
+        logger.error(f"Unexpected error during LaTeX cleaning: {e}")
+        return HttpResponse(f"Unexpected error during LaTeX cleaning: {e}", status=500)
+
+    # Step 4: Locate the pdflatex executable
+    pdflatex_path = shutil.which('pdflatex')
+    if not pdflatex_path:
+        logger.error("pdflatex executable not found in PATH.")
         return HttpResponse(
-            "pdflatex executable not found. Please ensure that LaTeX is installed correctly.",
+            "pdflatex executable not found. Please ensure that LaTeX is installed correctly and that 'pdflatex' is in your system's PATH.",
             status=500
         )
-    
-    # Render LaTeX to PDF using a temporary file
+    logger.debug(f"Using pdflatex at: {pdflatex_path}")
+
+    # Step 5: Create a temporary directory for LaTeX compilation
     with tempfile.TemporaryDirectory() as temp_dir:
-        logger.debug(f"Created temporary directory at {temp_dir}")
         tex_file_path = os.path.join(temp_dir, 'document.tex')
         pdf_file_path = os.path.join(temp_dir, 'document.pdf')
-        
-        # Write LaTeX code to .tex file
-        with open(tex_file_path, 'w') as tex_file:
-            tex_file.write(latex_code)
-        logger.debug(f"Wrote LaTeX code to {tex_file_path}")
-        
-        # Compile LaTeX to PDF using pdflatex
+
+        # Step 6: Write the cleaned LaTeX code to the .tex file
+        try:
+            with open(tex_file_path, 'w', encoding='utf-8') as tex_file:
+                tex_file.write(latex_code_clean)
+            logger.debug(f"Wrote cleaned LaTeX code to {tex_file_path}")
+        except Exception as e:
+            logger.error(f"Failed to write LaTeX code to file: {e}")
+            return HttpResponse("Failed to write LaTeX code to file.", status=500)
+
+        # Optional: Log the written LaTeX code for debugging
+        try:
+            with open(tex_file_path, 'r', encoding='utf-8') as tex_file:
+                written_latex_code = tex_file.read()
+                logger.debug(f"Written LaTeX code:\n{written_latex_code}")
+        except Exception as e:
+            logger.warning(f"Failed to read written LaTeX code for logging: {e}")
+
+        # Step 7: Compile the LaTeX code using pdflatex
         try:
             logger.debug("Starting pdflatex subprocess.")
             result = subprocess.run(
@@ -223,35 +259,47 @@ def render_latex(request, generation_id):
                 check=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                timeout=30  # Add a timeout to prevent hanging indefinitely
+                timeout=60  # Increased timeout to handle longer compilations
             )
-            logger.debug("pdflatex subprocess completed successfully.")
+
+            # Capture the standard output and error for debugging
+            stdout = result.stdout.decode('utf-8')
+            stderr = result.stderr.decode('utf-8')
+            logger.debug(f"pdflatex stdout:\n{stdout}")
+            logger.debug(f"pdflatex stderr:\n{stderr}")
+
         except subprocess.TimeoutExpired:
             logger.error("pdflatex subprocess timed out.")
             return HttpResponse("LaTeX compilation timed out.", status=500)
         except subprocess.CalledProcessError as e:
-            error_message = e.stderr.decode('utf-8')
+            # Capture and log the error message from pdflatex
+            error_message = e.stderr.decode('utf-8') if e.stderr else "No stderr captured."
             logger.error(f"Error compiling LaTeX: {error_message}")
             return HttpResponse(f"Error compiling LaTeX: {error_message}", status=500)
         except Exception as e:
             logger.error(f"Unexpected error during LaTeX compilation: {str(e)}")
             return HttpResponse(f"Unexpected error during LaTeX compilation: {str(e)}", status=500)
-        
-        # Read the generated PDF
+
+        # Step 8: Check if the PDF was created successfully
         if not os.path.exists(pdf_file_path):
             logger.error("PDF file was not created.")
             return HttpResponse("PDF file was not created.", status=500)
-        
-        with open(pdf_file_path, 'rb') as pdf_file:
-            pdf_content = pdf_file.read()
-        logger.debug("Read compiled PDF content.")
-    
-    # Encode PDF content to base64 for embedding in HTML
+
+        # Step 9: Read the generated PDF content
+        try:
+            with open(pdf_file_path, 'rb') as pdf_file:
+                pdf_content = pdf_file.read()
+            logger.debug("Read compiled PDF content.")
+        except Exception as e:
+            logger.error(f"Failed to read compiled PDF: {e}")
+            return HttpResponse("Failed to read compiled PDF.", status=500)
+
+    # Step 10: Encode PDF content to base64 for embedding in HTML
     pdf_base64 = base64.b64encode(pdf_content).decode('utf-8')
-    
-    # Render the LaTeX code and PDF preview on the web
+
+    # Step 11: Render the LaTeX code and PDF preview in the template
     return render(request, 'core/render_latex.html', {
-        'latex_code': latex_code,
+        'latex_code': latex_code_clean,
         'pdf_content': pdf_base64,
         'generation': generation,
     })
