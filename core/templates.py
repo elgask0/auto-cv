@@ -1,15 +1,17 @@
 # core/templates.py
 
 cv_template = r"""
-                    \documentclass[a4paper,10pt]{article}
+                    \documentclass[a4paper,9pt]{article}
                     \usepackage{hyperref}
-                    \usepackage[margin=1in]{geometry}
+                    \usepackage[margin=0.75in]{geometry}
                     \usepackage{enumitem}
                     \usepackage{titlesec}
 
                     % Define the format for section titles
                     \titleformat{\section}{\bfseries\Large}{}{0em}{}[\titlerule]
                     \titleformat{\subsection}{\bfseries\large}{}{0em}{}
+                    # \titlespacing*{\section}{0pt}{0.5ex plus 0.2ex minus 0.2ex}{0.5ex plus 0.2ex}
+                    
 
                     \begin{document}
 
@@ -67,26 +69,13 @@ cv_template = r"""
                     \textbf{Languages:} English (Fluent), Spanish (Intermediate). \\
                     \textbf{Soft Skills:} Problem-solving, communication, teamwork, attention to detail, adaptability.
 
-                    % Projects Section
-                    \section*{Projects}
-                    \textbf{Customer Churn Prediction Model} \hfill Jan 2021 - Apr 2021
-                    \begin{itemize}[left=0em]
-                        \item Developed a machine learning model to predict customer churn for an e-commerce company, achieving an accuracy of 87\%.
-                        \item Implemented data preprocessing steps, feature engineering, and model evaluation using Python.
-                    \end{itemize}
+                    % Flexible Section (change this name according to the needs)
+                    \section*{Flexible Section}
+                    \textbf{Projects:} Customer Segmentation using clustering techniques (K-Means, DBSCAN), Predictive Modeling for sales forecasting (ARIMA, Prophet), Real-time Data Streaming for anomaly detection (Kafka, Spark Streaming) \\
+                    \textbf{Publications:} "Machine Learning in Financial Risk Analysis" (Journal of Finance, 2021), "Deep Learning for Natural Language Processing" (Data Science Review, 2020), "Big Data Analytics in Healthcare" (Health Informatics Conference, 2019) \\
+                    \textbf{Certifications:} AWS Certified Machine Learning Specialty (2020), Google Professional Data Engineer (2019), Microsoft Certified: Azure AI Engineer Associate (2021) \\
+                    \textbf{Interests:} Data Privacy and Ethics, Quantum Computing, Data Visualization (Tableau, D3.js), Personal: Guitar playing, Cooking, Scuba diving \\
 
-                    \textbf{Sales Forecasting Dashboard} \hfill Sep 2020 - Dec 2020
-                    \begin{itemize}[left=0em]
-                        \item Designed an interactive dashboard in Tableau to forecast sales based on historical data and external factors.
-                        \item Presented findings to the sales team, leading to more data-driven decision-making.
-                    \end{itemize}
-
-                    % Certifications Section
-                    \section*{Certifications}
-                    \begin{itemize}[left=0em]
-                        \item \textbf{Google Data Analytics Professional Certificate} \hfill Dec 2020
-                        \item \textbf{Tableau Desktop Specialist} \hfill Aug 2020
-                    \end{itemize}
 
                     \end{document}
 
