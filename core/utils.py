@@ -136,58 +136,30 @@ def user_info_to_prompt_format(user_info):
     """
     return json.dumps(user_info, indent=2)
 
-
 def clean_latex(latex_escaped):
     """
-    Cleans and unescapes LaTeX code extracted from a JSON string.
-    
-    This function handles common escaping issues such as double backslashes,
-    escaped newlines, and Unicode characters to ensure the LaTeX code is
-    properly formatted for compilation.
+    Cleans the LaTeX code by handling escaped newlines and ensuring proper backslashes.
 
     Parameters:
     - latex_escaped (str): The raw LaTeX string extracted from JSON.
 
     Returns:
-    - str: The cleaned and unescaped LaTeX string.
+    - str: The cleaned LaTeX string.
     """
     try:
-        # Step 1: Decode Unicode escape sequences
-        # This handles sequences like \n, \t, etc.
-        latex_unescaped = latex_escaped.encode('utf-8').decode('unicode_escape')
-        logger.debug("Successfully decoded Unicode escape sequences.")
+        # Replace escaped newline characters with actual newlines
+        latex_unescaped = latex_escaped.replace('\\n', '\n')
+        logger.debug("Replaced '\\n' with actual newline characters.")
 
-        # Step 2: Replace quadruple backslashes with double backslashes
-        # This is useful if backslashes were over-escaped
-        latex_unescaped = latex_unescaped.replace('\\\\\\', '\\\\')
-        logger.debug("Replaced quadruple backslashes with double backslashes.")
-
-        # Step 3: Replace double backslashes with single backslashes
-        # This corrects the escape character issue
-        latex_unescaped = latex_unescaped.replace('\\\\', '\\')
-        logger.debug("Replaced double backslashes with single backslashes.")
-
-        # Step 4: Replace escaped newlines with actual newlines
-        latex_unescaped = latex_unescaped.replace('\\n', '\n')
-        logger.debug("Replaced escaped newlines with actual newlines.")
-
-        # Step 5: Handle any remaining escaped characters if necessary
-        # For example, unescape percent signs if they were escaped
-        # Uncomment the following line if your LaTeX uses escaped percent signs
-        # latex_unescaped = latex_unescaped.replace('\\%', '%')
-
-        # Additional cleaning steps can be added here as needed
+        # At this point, backslashes are correctly represented as single backslashes
+        # If there are double backslashes intended for LaTeX (e.g., line breaks), they should remain as is
 
         return latex_unescaped
 
-    except UnicodeDecodeError as ude:
-        logger.error("Unicode decode error during LaTeX cleaning.")
-        raise ValueError("Invalid escape sequences in LaTeX code.") from ude
     except Exception as e:
         logger.error(f"Unexpected error during LaTeX cleaning: {e}")
         raise
 
-# core/schemas.py
 
 from pydantic import BaseModel
 

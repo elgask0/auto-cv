@@ -178,14 +178,11 @@ def document_list(request):
     generations = Generation.objects.filter(user=request.user).order_by('-created_at')
     return render(request, 'core/document_list.html', {'generations': generations})
 
+
 @login_required
 def render_latex(request, generation_id):
     """
     Renders the LaTeX code from the Generation model into a PDF and returns it.
-
-    This view retrieves LaTeX code stored as a JSON string in the Generation model,
-    cleans and formats it appropriately, compiles it using pdflatex, and returns
-    the resulting PDF to the user.
 
     Parameters:
     - request: The HTTP request object.
@@ -211,29 +208,41 @@ def render_latex(request, generation_id):
     try:
         latex_code_clean = clean_latex(latex_code_raw)
         logger.debug("Successfully cleaned LaTeX code.")
-    except ValueError as ve:
-        logger.error(f"LaTeX cleaning failed: {ve}")
-        return HttpResponse(f"LaTeX cleaning failed: {ve}", status=400)
     except Exception as e:
-        logger.error(f"Unexpected error during LaTeX cleaning: {e}")
-        return HttpResponse(f"Unexpected error during LaTeX cleaning: {e}", status=500)
+        logger.error(f"LaTeX cleaning failed: {e}")
+        return HttpResponse(f"LaTeX cleaning failed: {e}", status=400)
 
-    # Step 4: Locate the pdflatex executable
+    # Step 4: Ensure the LaTeX preamble includes the inputenc package for Unicode
+    if '\\usepackage[utf8]{inputenc}' not in latex_code_clean:
+        # Insert \usepackage[utf8]{inputenc} after \documentclass
+        latex_code_clean = latex_code_clean.replace(
+            '\\documentclass[a4paper,10pt]{article}',
+            '\\documentclass[a4paper,10pt]{article}\n\\usepackage[utf8]{inputenc}'
+        )
+        logger.debug("Added '\\usepackage[utf8]{inputenc}' to the LaTeX preamble.")
+
+    # Step 5: Locate the pdflatex executable
+    # Option 1: If pdflatex is in PATH
     pdflatex_path = shutil.which('pdflatex')
     if not pdflatex_path:
-        logger.error("pdflatex executable not found in PATH.")
-        return HttpResponse(
-            "pdflatex executable not found. Please ensure that LaTeX is installed correctly and that 'pdflatex' is in your system's PATH.",
-            status=500
-        )
-    logger.debug(f"Using pdflatex at: {pdflatex_path}")
+        # Option 2: Specify the full path to pdflatex
+        pdflatex_path = '/Library/TeX/texbin/pdflatex'
+        if not os.path.exists(pdflatex_path):
+            logger.error("pdflatex executable not found in PATH or at '/Library/TeX/texbin/pdflatex'.")
+            return HttpResponse(
+                "pdflatex executable not found. Please ensure that LaTeX is installed correctly and that 'pdflatex' is in your system's PATH.",
+                status=500
+            )
+        logger.debug(f"Using pdflatex at: {pdflatex_path}")
+    else:
+        logger.debug(f"Using pdflatex at: {pdflatex_path}")
 
-    # Step 5: Create a temporary directory for LaTeX compilation
+    # Step 6: Create a temporary directory for LaTeX compilation
     with tempfile.TemporaryDirectory() as temp_dir:
         tex_file_path = os.path.join(temp_dir, 'document.tex')
         pdf_file_path = os.path.join(temp_dir, 'document.pdf')
 
-        # Step 6: Write the cleaned LaTeX code to the .tex file
+        # Step 7: Write the cleaned LaTeX code to the .tex file
         try:
             with open(tex_file_path, 'w', encoding='utf-8') as tex_file:
                 tex_file.write(latex_code_clean)
@@ -250,7 +259,7 @@ def render_latex(request, generation_id):
         except Exception as e:
             logger.warning(f"Failed to read written LaTeX code for logging: {e}")
 
-        # Step 7: Compile the LaTeX code using pdflatex
+        # Step 8: Compile the LaTeX code using pdflatex
         try:
             logger.debug("Starting pdflatex subprocess.")
             result = subprocess.run(
@@ -280,12 +289,12 @@ def render_latex(request, generation_id):
             logger.error(f"Unexpected error during LaTeX compilation: {str(e)}")
             return HttpResponse(f"Unexpected error during LaTeX compilation: {str(e)}", status=500)
 
-        # Step 8: Check if the PDF was created successfully
+        # Step 9: Check if the PDF was created successfully
         if not os.path.exists(pdf_file_path):
             logger.error("PDF file was not created.")
             return HttpResponse("PDF file was not created.", status=500)
 
-        # Step 9: Read the generated PDF content
+        # Step 10: Read the generated PDF content
         try:
             with open(pdf_file_path, 'rb') as pdf_file:
                 pdf_content = pdf_file.read()
@@ -294,10 +303,10 @@ def render_latex(request, generation_id):
             logger.error(f"Failed to read compiled PDF: {e}")
             return HttpResponse("Failed to read compiled PDF.", status=500)
 
-    # Step 10: Encode PDF content to base64 for embedding in HTML
+    # Step 11: Encode PDF content to base64 for embedding in HTML
     pdf_base64 = base64.b64encode(pdf_content).decode('utf-8')
 
-    # Step 11: Render the LaTeX code and PDF preview in the template
+    # Step 12: Render the LaTeX code and PDF preview in the template
     return render(request, 'core/render_latex.html', {
         'latex_code': latex_code_clean,
         'pdf_content': pdf_base64,
