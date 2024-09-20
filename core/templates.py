@@ -82,27 +82,56 @@ cv_template = r"""
                     """
 
 cover_letter_template = r"""
-                    % Author: [Name Placeholder]
-                    \documentclass[11pt,a4paper]{moderncv}
-                    \moderncvstyle{classic}
-                    \moderncvcolor{black}
-                    \usepackage[utf8]{inputenc}
-                    \usepackage[scale=0.80]{geometry}
-                    \name{[Name Placeholder]}{}
-                    \phone[mobile]{[Phone Placeholder]}
-                    \email{[Email Placeholder]}
+                    \documentclass[a4paper,12pt]{article}
+\usepackage{hyperref}
+\usepackage[margin=1in]{geometry}
+\usepackage{enumitem}
+\usepackage{titlesec}
 
-                    \begin{document}
+% Define the format for section titles
+\titleformat{\section}{\bfseries\Large}{}{0em}{}[\titlerule]
+\titleformat{\subsection}{\bfseries\large}{}{0em}{}
+%\titlespacing*{\section}{0pt}{0.5ex plus 0.2ex minus 0.2ex}{0.5ex plus 0.2ex}
 
-                    \recipient{[Recipient Placeholder]}{[Company Name] \\ [Company Address]}
-                    \date{\today}
-                    \opening{Dear [Recipient Name],}
-                    \closing{Sincerely,\\[2ex][Name Placeholder]}
-                    \makelettertitle
+\pagestyle{empty} % Avoid page number
 
-                    % Body of the cover letter template with placeholders for content
+\begin{document}
 
-                    \makeletterclosing
+\begin{center}
+    {\LARGE \textbf{Jane Doe}} \\ % Your name
+    \vspace{0.2cm}
+    New York, NY | (123) 456-7890 | \href{mailto:jane.doe@example.com}{jane.doe@example.com} \\
+    \href{https://www.linkedin.com/in/janedoe}{LinkedIn}
+\end{center}
 
-                    \end{document}
+\vspace{0.5cm} % Vertical space between contact information and date
+
+September 20, 2024
+
+Hiring Manager \\
+Data Solutions Inc.
+
+\vspace{0.5cm} % Vertical space before the opening
+
+\textbf{Dear Hiring Manager,}
+
+I am writing to express my strong interest in the Data Analyst position at Data Solutions Inc. As a recent graduate with a Master’s degree in Data Science from New York University and a passion for turning data into impactful business decisions, I am excited about the opportunity to contribute to your team’s success.
+
+During my academic career, I developed a comprehensive skill set in statistical analysis, data visualization, and programming languages such as Python and SQL. I have successfully applied these skills to several real-world projects, including a predictive analytics model for customer churn that achieved an 87\% accuracy rate. My hands-on experience in analyzing complex datasets, building predictive models, and presenting data-driven insights has prepared me well for this role.
+
+What truly sets me apart is my ability to bridge the gap between technical data analysis and strategic business decisions. I believe that effective data analysis is not just about understanding the numbers but about transforming those numbers into a narrative that drives strategic growth. My previous internship at XYZ Corp taught me the importance of clear communication, as I worked closely with cross-functional teams to develop data-driven solutions that increased operational efficiency by 20\%. I am eager to bring this unique blend of technical expertise and business acumen to Data Solutions Inc.
+
+Moreover, I thrive in dynamic, fast-paced environments. My experience working on collaborative projects, such as developing a sales forecasting dashboard for a leading retail client, showcased my ability to work under pressure and meet tight deadlines without compromising on quality. I am confident that my proactive approach and problem-solving mindset will allow me to make a significant contribution to your team from day one.
+
+I am genuinely excited about the prospect of joining Data Solutions Inc. and leveraging my skills to support your data-driven initiatives. I am confident that my technical skills, analytical mindset, and passion for data analysis make me a strong candidate for this role. I would welcome the opportunity to discuss how my background and qualifications align with your team’s needs in more detail.
+
+Thank you for considering my application. I look forward to the possibility of contributing to the continued success of Data Solutions Inc.
+
+\vspace{0.5cm} % Vertical space before the closing
+
+\textbf{Sincerely,} \\
+\textbf{Jane Doe}
+
+\end{document}
+
                     """
