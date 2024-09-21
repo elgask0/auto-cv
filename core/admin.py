@@ -18,7 +18,7 @@ class ExperienceAdmin(admin.ModelAdmin):
 
 @admin.register(Generation)
 class GenerationAdmin(admin.ModelAdmin):
-    list_display = ('id', 'user', 'generation_type', 'created_at')
+    list_display = ('id', 'user', 'generation_type', 'job_title', 'company', 'created_at')
     list_display_links = ('id', 'user')  # Makes 'id' and 'user' clickable
     readonly_fields = ('id', 'created_at')  # Optional: make 'id' and 'created_at' read-only
-    fields = ('id', 'user', 'job_description', 'generation_type', 'json_output', 'created_at')
+    fields = ('id', 'user', 'job_description', 'generation_type', 'job_title', 'company', 'json_output', 'created_at')

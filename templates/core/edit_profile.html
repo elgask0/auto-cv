@@ -1,12 +1,270 @@
 <!-- core/templates/core/edit_profile.html -->
 
 {% extends "base.html" %}
+{% load static %}
+{% load custom_filters %}
 
 {% block content %}
 <h2>Edit Profile</h2>
 <form method="post">
     {% csrf_token %}
-    {{ form.as_p }}
+    
+    <!-- Basic Information Section -->
+    <h3>Basic Information</h3>
+    
+    <div class="mb-3">
+        {{ profile_form.name.label_tag }}
+        {{ profile_form.name }}
+        {% for error in profile_form.name.errors %}
+            <div class="text-danger">{{ error }}</div>
+        {% endfor %}
+    </div>
+    
+    <div class="mb-3">
+        {{ profile_form.phone.label_tag }}
+        {{ profile_form.phone }}
+        {% for error in profile_form.phone.errors %}
+            <div class="text-danger">{{ error }}</div>
+        {% endfor %}
+    </div>
+    
+    <div class="mb-3">
+        {{ profile_form.city.label_tag }}
+        {{ profile_form.city }}
+        {% for error in profile_form.city.errors %}
+            <div class="text-danger">{{ error }}</div>
+        {% endfor %}
+    </div>
+    
+    <div class="mb-3">
+        {{ profile_form.state.label_tag }}
+        {{ profile_form.state }}
+        {% for error in profile_form.state.errors %}
+            <div class="text-danger">{{ error }}</div>
+        {% endfor %}
+    </div>
+
+    <div class="mb-3">
+        {{ profile_form.postal_code.label_tag }}
+        {{ profile_form.postal_code }}
+        {% for error in profile_form.postal_code.errors %}
+            <div class="text-danger">{{ error }}</div>
+        {% endfor %}
+    </div>
+    
+    <div class="mb-3">
+        {{ profile_form.linkedin_link.label_tag }}
+        {{ profile_form.linkedin_link }}
+        {% for error in profile_form.linkedin_link.errors %}
+            <div class="text-danger">{{ error }}</div>
+        {% endfor %}
+    </div>
+    
+    <div class="mb-3">
+        {{ profile_form.summary.label_tag }}
+        {{ profile_form.summary }}
+        {% for error in profile_form.summary.errors %}
+            <div class="text-danger">{{ error }}</div>
+        {% endfor %}
+    </div>
+    
+    <div class="mb-3">
+        {{ profile_form.skills.label_tag }}
+        {{ profile_form.skills }}
+        <small class="form-text text-muted">{{ profile_form.skills.help_text }}</small>
+        {% for error in profile_form.skills.errors %}
+            <div class="text-danger">{{ error }}</div>
+        {% endfor %}
+    </div>
+    
+    <div class="mb-3">
+        {{ profile_form.publications.label_tag }}
+        {{ profile_form.publications }}
+        <small class="form-text text-muted">{{ profile_form.publications.help_text }}</small>
+        {% for error in profile_form.publications.errors %}
+            <div class="text-danger">{{ error }}</div>
+        {% endfor %}
+    </div>
+    
+    <div class="mb-3">
+        {{ profile_form.projects.label_tag }}
+        {{ profile_form.projects }}
+        <small class="form-text text-muted">{{ profile_form.projects.help_text }}</small>
+        {% for error in profile_form.projects.errors %}
+            <div class="text-danger">{{ error }}</div>
+        {% endfor %}
+    </div>
+    
+    <div class="mb-3">
+        {{ profile_form.interests.label_tag }}
+        {{ profile_form.interests }}
+        <small class="form-text text-muted">{{ profile_form.interests.help_text }}</small>
+        {% for error in profile_form.interests.errors %}
+            <div class="text-danger">{{ error }}</div>
+        {% endfor %}
+    </div>
+
+    <hr>
+
+    <!-- Education Formset -->
+    <h3>Education</h3>
+    {{ education_formset.management_form }}
+    <div id="educations-container">
+        {% for form in education_formset %}
+            <div class="education-form mb-4 border p-3">
+                {% for hidden in form.hidden_fields %}
+                    {{ hidden }}
+                {% endfor %}
+                {% for field in form.visible_fields %}
+                    {% if field.name != 'DELETE' and field.name != 'id' and field.name != 'profile' %}
+                        <div class="mb-3">
+                            {{ field.label_tag }}
+                            {{ field }}
+                            {% if field.help_text %}
+                                <small class="form-text text-muted">{{ field.help_text }}</small>
+                            {% endif %}
+                            {% for error in field.errors %}
+                                <div class="text-danger">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                {% endfor %}
+                <div class="form-check mb-3">
+                    {{ form.DELETE }}
+                    {{ form.DELETE.label_tag }}
+                </div>
+                <hr>
+            </div>
+        {% empty %}
+            <p>No education entries yet.</p>
+        {% endfor %}
+    </div>
+    <button type="button" class="btn btn-secondary mb-3" onclick="addForm('educations')">Add Education</button>
+
+    <hr>
+
+    <!-- Experience Formset -->
+    <h3>Experience</h3>
+    {{ experience_formset.management_form }}
+    <div id="experiences-container">
+        {% for form in experience_formset %}
+            <div class="experience-form mb-4 border p-3">
+                {% for hidden in form.hidden_fields %}
+                    {{ hidden }}
+                {% endfor %}
+                {% for field in form.visible_fields %}
+                    {% if field.name != 'DELETE' and field.name != 'id' and field.name != 'profile' %}
+                        <div class="mb-3">
+                            {{ field.label_tag }}
+                            {{ field }}
+                            {% if field.help_text %}
+                                <small class="form-text text-muted">{{ field.help_text }}</small>
+                            {% endif %}
+                            {% for error in field.errors %}
+                                <div class="text-danger">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                {% endfor %}
+                <div class="form-check mb-3">
+                    {{ form.DELETE }}
+                    {{ form.DELETE.label_tag }}
+                </div>
+                <hr>
+            </div>
+        {% empty %}
+            <p>No experience entries yet.</p>
+        {% endfor %}
+    </div>
+    <button type="button" class="btn btn-secondary mb-3" onclick="addForm('experiences')">Add Experience</button>
+
+    <hr>
+
     <button type="submit" class="btn btn-success">Save Changes</button>
 </form>
+
+<!-- JavaScript for Dynamic Form Addition -->
+<script>
+    function addForm(prefix) {
+        let totalForms = document.getElementById(`id_${prefix}-TOTAL_FORMS`);
+        if (!totalForms) {
+            alert(`Cannot find TOTAL_FORMS for prefix '${prefix}'.`);
+            return;
+        }
+        let currentForm = parseInt(totalForms.value);
+        
+        let formContainer = document.getElementById(`${prefix}-container`);
+        if (!formContainer) {
+            alert(`Cannot find container for prefix '${prefix}'.`);
+            return;
+        }
+        
+        let emptyFormTemplate = document.getElementById(`empty_${prefix}_form`);
+        if (!emptyFormTemplate) {
+            alert(`Cannot find empty form template for prefix '${prefix}'.`);
+            return;
+        }
+        
+        let newForm = emptyFormTemplate.innerHTML.replace(/__prefix__/g, currentForm);
+        formContainer.insertAdjacentHTML('beforeend', newForm);
+        
+        totalForms.value = currentForm + 1;
+    }
+</script>
+
+<!-- Hidden Empty Forms for Dynamic Addition -->
+<div id="empty_educations_form" style="display: none;">
+    <div class="education-form mb-4 border p-3">
+        {% for hidden in education_formset.empty_form.hidden_fields %}
+            {{ hidden }}
+        {% endfor %}
+        {% for field in education_formset.empty_form.visible_fields %}
+            {% if field.name != 'DELETE' and field.name != 'id' and field.name != 'profile' %}
+                <div class="mb-3">
+                    {{ field.label_tag }}
+                    {{ field }}
+                    {% if field.help_text %}
+                        <small class="form-text text-muted">{{ field.help_text }}</small>
+                    {% endif %}
+                    {% for error in field.errors %}
+                        <div class="text-danger">{{ error }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endfor %}
+        <div class="form-check mb-3">
+            {{ education_formset.empty_form.DELETE }}
+            {{ education_formset.empty_form.DELETE.label_tag }}
+        </div>
+        <hr>
+    </div>
+</div>
+
+<div id="empty_experiences_form" style="display: none;">
+    <div class="experience-form mb-4 border p-3">
+        {% for hidden in experience_formset.empty_form.hidden_fields %}
+            {{ hidden }}
+        {% endfor %}
+        {% for field in experience_formset.empty_form.visible_fields %}
+            {% if field.name != 'DELETE' and field.name != 'id' and field.name != 'profile' %}
+                <div class="mb-3">
+                    {{ field.label_tag }}
+                    {{ field }}
+                    {% if field.help_text %}
+                        <small class="form-text text-muted">{{ field.help_text }}</small>
+                    {% endif %}
+                    {% for error in field.errors %}
+                        <div class="text-danger">{{ error }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endfor %}
+        <div class="form-check mb-3">
+            {{ experience_formset.empty_form.DELETE }}
+            {{ experience_formset.empty_form.DELETE.label_tag }}
+        </div>
+        <hr>
+    </div>
+</div>
+
 {% endblock %}

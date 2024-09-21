@@ -13,6 +13,9 @@ class UserProfile(models.Model):
     publications = models.TextField(blank=True, help_text="Enter publications separated by ; or new lines.")
     projects = models.TextField(blank=True, help_text="Enter projects separated by ; or new lines.")
     interests = models.TextField(blank=True, help_text="Enter interests separated by ; or new lines.")
+    city = models.CharField(max_length=100, blank=True, null=True)  # Allow null and blank values
+    state = models.CharField(max_length=100, blank=True, null=True)  # Allow null and blank values
+    postal_code = models.CharField(max_length=20, blank=True, null=True)  # Allow null and blank values
 
     def __str__(self):
         return self.name
@@ -21,6 +24,8 @@ class Education(models.Model):
     profile = models.ForeignKey(UserProfile, on_delete=models.CASCADE, related_name='educations')
     education_level = models.CharField(max_length=100)  # e.g., Bachelor, Master
     university = models.CharField(max_length=255)
+    city = models.CharField(max_length=100, blank=True, null=True)  # Allow null and blank values
+    state = models.CharField(max_length=100, blank=True, null=True)  # Allow null and blank values
     start_date = models.DateField()
     end_date = models.DateField(blank=True, null=True)  # Optional for ongoing studies
     specialization = models.CharField(max_length=255, blank=True)
@@ -33,7 +38,8 @@ class Education(models.Model):
 class Experience(models.Model):
     profile = models.ForeignKey(UserProfile, on_delete=models.CASCADE, related_name='experiences')
     company = models.CharField(max_length=255)
-    city = models.CharField(max_length=100)
+    city = models.CharField(max_length=100, blank=True, null=True)  # Allow null and blank values
+    state = models.CharField(max_length=100, blank=True, null=True)  # Allow null and blank values
     title = models.CharField(max_length=255)
     start_date = models.DateField()
     end_date = models.DateField(blank=True, null=True)  # Optional for current positions
@@ -41,12 +47,20 @@ class Experience(models.Model):
 
     def __str__(self):
         return f"{self.title} at {self.company}"
+
 class Generation(models.Model):
+    GENERATION_TYPES = [
+        ('cv', 'Curriculum Vitae'),
+        ('cover_letter', 'Cover Letter'),
+        # Add more types as needed
+    ]
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     job_description = models.TextField()
-    generation_type = models.CharField(max_length=50)
+    generation_type = models.CharField(max_length=20, choices=GENERATION_TYPES)
+    job_title = models.CharField(max_length=100, blank=True, null=True)  # New Field
+    company = models.CharField(max_length=100, blank=True, null=True)     # New Field
     json_output = models.JSONField()
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.generation_type.title()} for {self.user.username}"
+        return f"{self.get_generation_type_display()} for {self.user.username}"

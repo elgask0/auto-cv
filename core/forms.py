@@ -2,20 +2,36 @@
 
 from django import forms
 from .models import UserProfile, Education, Experience
+from django.forms import inlineformset_factory
 
 class UserProfileForm(forms.ModelForm):
     class Meta:
         model = UserProfile
-        fields = ['name', 'phone', 'linkedin_link', 'summary', 'skills', 'publications', 'projects', 'interests']
+        fields = [
+            'name', 
+            'phone', 
+            'linkedin_link', 
+            'summary', 
+            'skills', 
+            'publications', 
+            'projects', 
+            'interests',
+            'city',        # Added
+            'state',       # Added
+            'postal_code', # Optional
+        ]
         widgets = {
-            'name': forms.TextInput(attrs={'class': 'form-control'}),
-            'phone': forms.TextInput(attrs={'class': 'form-control'}),
-            'linkedin_link': forms.URLInput(attrs={'class': 'form-control'}),
-            'summary': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
-            'skills': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
-            'publications': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
-            'projects': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
-            'interests': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Full Name'}),
+            'phone': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g., 1234567890'}),
+            'linkedin_link': forms.URLInput(attrs={'class': 'form-control', 'placeholder': 'https://linkedin.com/in/yourprofile'}),
+            'summary': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'A brief summary about yourself...'}),
+            'skills': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'e.g., Python; Django; REST APIs'}),
+            'publications': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'List publications separated by ; or new lines.'}),
+            'projects': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'List projects separated by ; or new lines.'}),
+            'interests': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'List interests separated by ; or new lines.'}),
+            'city': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'City'}),        # Added
+            'state': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'State'}),      # Added
+            'postal_code': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Postal Code'}),  # Optional
         }
 
     def clean_phone(self):
@@ -27,15 +43,20 @@ class UserProfileForm(forms.ModelForm):
 class EducationForm(forms.ModelForm):
     class Meta:
         model = Education
-        fields = ['education_level', 'university', 'start_date', 'end_date', 'specialization', 'thesis', 'relevant_subjects']
+        fields = [
+            'education_level', 'university', 'city', 'state', 
+            'start_date', 'end_date', 'specialization', 'thesis', 'relevant_subjects'
+        ]
         widgets = {
-            'education_level': forms.TextInput(attrs={'class': 'form-control'}),
-            'university': forms.TextInput(attrs={'class': 'form-control'}),
+            'education_level': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g., Bachelor, Master'}),
+            'university': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g., University of XYZ'}),
+            'city': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'City'}),
+            'state': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'State'}),
             'start_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
             'end_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
-            'specialization': forms.TextInput(attrs={'class': 'form-control'}),
-            'thesis': forms.TextInput(attrs={'class': 'form-control'}),
-            'relevant_subjects': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
+            'specialization': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Specialization (optional)'}),
+            'thesis': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Thesis Title (optional)'}),
+            'relevant_subjects': forms.Textarea(attrs={'class': 'form-control', 'rows': 2, 'placeholder': 'List relevant subjects...'}),
         }
 
     def clean(self):
@@ -49,14 +70,18 @@ class EducationForm(forms.ModelForm):
 class ExperienceForm(forms.ModelForm):
     class Meta:
         model = Experience
-        fields = ['company', 'city', 'title', 'start_date', 'end_date', 'description']
+        fields = [
+            'company', 'city', 'state', 'title', 
+            'start_date', 'end_date', 'description'
+        ]
         widgets = {
-            'company': forms.TextInput(attrs={'class': 'form-control'}),
-            'city': forms.TextInput(attrs={'class': 'form-control'}),
-            'title': forms.TextInput(attrs={'class': 'form-control'}),
+            'company': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g., Tech Innovators Inc.'}),
+            'city': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'City'}),
+            'state': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'State'}),
+            'title': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g., Senior Software Engineer'}),
             'start_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
             'end_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
-            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Describe your role and responsibilities...'}),
         }
 
     def clean(self):
@@ -66,6 +91,23 @@ class ExperienceForm(forms.ModelForm):
 
         if end_date and end_date < start_date:
             raise forms.ValidationError("End date cannot be earlier than start date.")
+
+# Define inline formsets for Education and Experience
+EducationFormSet = inlineformset_factory(
+    UserProfile,
+    Education,
+    form=EducationForm,
+    extra=0,  # Set to 0 to prevent extra forms on page load
+    can_delete=True,
+)
+
+ExperienceFormSet = inlineformset_factory(
+    UserProfile,
+    Experience,
+    form=ExperienceForm,
+    extra=0,  # Set to 0 to prevent extra forms on page load
+    can_delete=True,
+)
 
 class GenerationForm(forms.Form):
     GENERATION_TYPE_CHOICES = [

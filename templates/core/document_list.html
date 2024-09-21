@@ -8,6 +8,8 @@
     <thead>
         <tr>
             <th>Type</th>
+            <th>Job Title</th>
+            <th>Company</th>
             <th>Job Description</th>
             <th>Generated On</th>
             <th>Actions</th>
@@ -17,6 +19,8 @@
         {% for gen in generations %}
         <tr>
             <td>{{ gen.get_generation_type_display }}</td>
+            <td>{{ gen.job_title }}</td>
+            <td>{{ gen.company }}</td>
             <td>{{ gen.job_description|truncatechars:50 }}</td>
             <td>{{ gen.created_at|date:"Y-m-d H:i" }}</td>
             <td>
@@ -26,7 +30,7 @@
         </tr>
         {% empty %}
         <tr>
-            <td colspan="4">No documents generated yet.</td>
+            <td colspan="6">No documents generated yet.</td>
         </tr>
         {% endfor %}
     </tbody>

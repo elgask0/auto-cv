@@ -3,6 +3,12 @@
 import json
 import re
 import logging
+from openai import OpenAI
+from pydantic import BaseModel, ValidationError
+import os
+from django.conf import settings
+
+client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
 # Configure logger
 logger = logging.getLogger(__name__)
@@ -160,9 +166,58 @@ def clean_latex(latex_escaped):
         logger.error(f"Unexpected error during LaTeX cleaning: {e}")
         raise
 
-
-from pydantic import BaseModel
-
 class LatexOutput(BaseModel):
     latex_code: str
 
+
+class JobDetails(BaseModel):
+    job_title: str
+    company: str
+
+def extract_job_details(job_description: str) -> JobDetails:
+    """
+    Uses OpenAI's GPT to extract job_title and company from the job_description.
+
+    Args:
+        job_description (str): The job description text.
+
+    Returns:
+        JobDetails: A Pydantic model containing job_title and company.
+    """
+    try:
+        # Define the prompt
+        prompt = (
+                "Extract the job title and company from the following job description.\n\n"
+                "Job Description:\n"
+                f"{job_description}\n\n"
+                "Provide ONLY the JSON output with the following structure and no additional text:\n"
+                "```\n"
+                "{\n"
+                '  "job_title": "",\n'
+                '  "company": ""\n'
+                "}\n"
+                "```"
+        )
+        
+        # Call OpenAI's Completion API
+        response = client.beta.chat.completions.parse(
+                        model="gpt-4o-2024-08-06",
+                        messages=[
+                            {"role": "system", "content": "You are a helpful assistant designed to output Job details in JSON strcutured format."},
+                            {"role": "user", "content": prompt}
+                        ],
+                        response_format=JobDetails,
+                        max_tokens=1000,
+                        temperature=0.7
+                    )
+                    
+                    # Extract the parsed response using the Pydantic model
+        JobOutput = response.choices[0].message.parsed
+
+        logger.debug(f"Extracted Text from OpenAI: {JobOutput}")
+        
+        return JobOutput
+    
+    except Exception as e:
+        logger.error(f"Unexpected error during job details extraction: {e}")
+        raise e

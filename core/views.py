@@ -4,7 +4,12 @@ from openai import OpenAI
 import json
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
-from .forms import UserProfileForm, EducationForm, ExperienceForm, GenerationForm
+from .forms import (
+    UserProfileForm, 
+    EducationFormSet, 
+    ExperienceFormSet, 
+    GenerationForm
+)
 from .models import UserProfile, Education, Experience, Generation
 from .prompts import generate_cv_prompt, generate_cover_letter_prompt
 from .utils import (
@@ -14,7 +19,8 @@ from .utils import (
     format_user_list_field,
     user_info_to_prompt_format,
     LatexOutput,  # Import the function schema,
-    clean_latex
+    clean_latex,
+    extract_job_details
 )
 from .templates import cv_template, cover_letter_template
 from django.conf import settings
@@ -45,45 +51,44 @@ def view_profile(request):
 
 @login_required
 def edit_profile(request):
-    profile = request.user.userprofile
+    # Retrieve or create the UserProfile instance for the current user
+    profile, created = UserProfile.objects.get_or_create(user=request.user)
+    
     if request.method == 'POST':
-        form = UserProfileForm(request.POST, instance=profile)
-        if form.is_valid():
-            form.save()
+        # Bind the UserProfileForm with POST data
+        profile_form = UserProfileForm(request.POST, instance=profile)
+        
+        # Bind the EducationFormSet with POST data and associate it with the UserProfile
+        education_formset = EducationFormSet(request.POST, instance=profile, prefix='educations')
+        
+        # Bind the ExperienceFormSet with POST data and associate it with the UserProfile
+        experience_formset = ExperienceFormSet(request.POST, instance=profile, prefix='experiences')
+        
+        # Validate all forms and formsets
+        if profile_form.is_valid() and education_formset.is_valid() and experience_formset.is_valid():
+            # Save the UserProfile
+            profile_form.save()
+            # Save all Education entries
+            education_formset.save()
+            # Save all Experience entries
+            experience_formset.save()
+            # Redirect to the profile view upon successful save
             return redirect('view_profile')
     else:
-        form = UserProfileForm(instance=profile)
-    return render(request, 'core/edit_profile.html', {'form': form})
-
-@login_required
-def add_education(request):
-    if request.method == 'POST':
-        form = EducationForm(request.POST)
-        if form.is_valid():
-            education = form.save(commit=False)
-            education.profile = request.user.userprofile
-            education.save()
-            return redirect('view_profile')
-    else:
-        form = EducationForm()
-    return render(request, 'core/add_education.html', {'form': form})
-
-@login_required
-def add_experience(request):
-    if request.method == 'POST':
-        form = ExperienceForm(request.POST)
-        if form.is_valid():
-            experience = form.save(commit=False)
-            experience.profile = request.user.userprofile
-            experience.save()
-            return redirect('view_profile')
-    else:
-        form = ExperienceForm()
-    return render(request, 'core/add_experience.html', {'form': form})
-
-
-
-
+        # Initialize the UserProfileForm with existing data
+        profile_form = UserProfileForm(instance=profile)
+        # Initialize the EducationFormSet with existing Education entries
+        education_formset = EducationFormSet(instance=profile, prefix='educations')
+        # Initialize the ExperienceFormSet with existing Experience entries
+        experience_formset = ExperienceFormSet(instance=profile, prefix='experiences')
+    
+    # Pass all forms and formsets to the template context
+    context = {
+        'profile_form': profile_form,
+        'education_formset': education_formset,
+        'experience_formset': experience_formset,
+    }
+    return render(request, 'core/edit_profile.html', context)
 @login_required
 def generate_documents(request):
     if request.method == 'POST':
@@ -137,6 +142,11 @@ def generate_documents(request):
                     prompt = generate_cover_letter_prompt(user_info_str, escaped_job_description, template)
                 
                 try:
+                    # Extract job details
+                    job_details = extract_job_details(job_description)
+                    job_title = job_details.job_title
+                    company = job_details.company
+                    
                     response = client.beta.chat.completions.parse(
                         model="gpt-4o-2024-08-06",
                         messages=[
@@ -156,8 +166,11 @@ def generate_documents(request):
                         user=request.user,
                         job_description=job_description,
                         generation_type=gen_type,
+                        job_title=job_title,
+                        company=company,
                         json_output=latex_output.dict(),  # Convert Pydantic model to dictionary
                     )
+
                 except ValidationError as ve:
                     logger.error(f"Pydantic validation error for {gen_type}: {ve}")
                     form.add_error(None, f"Error validating JSON output for {gen_type}. Please try again.")
@@ -177,7 +190,6 @@ def generate_documents(request):
 def document_list(request):
     generations = Generation.objects.filter(user=request.user).order_by('-created_at')
     return render(request, 'core/document_list.html', {'generations': generations})
-
 
 @login_required
 def render_latex(request, generation_id):
@@ -319,26 +331,65 @@ def download_pdf(request, generation_id):
     
     latex_code = generation.json_output.get('latex_code', '')
     
-    # Generate PDF from LaTeX
+    if not latex_code:
+        logger.error(f"No LaTeX code found for Generation ID: {generation_id}")
+        return HttpResponse("No LaTeX code found for this document.", status=400)
+    
     with tempfile.TemporaryDirectory() as temp_dir:
         tex_file_path = os.path.join(temp_dir, 'document.tex')
         pdf_file_path = os.path.join(temp_dir, 'document.pdf')
         
         # Write LaTeX code to .tex file
-        with open(tex_file_path, 'w') as tex_file:
-            tex_file.write(latex_code)
+        try:
+            with open(tex_file_path, 'w', encoding='utf-8') as tex_file:
+                tex_file.write(latex_code)
+            logger.debug(f"Wrote LaTeX code to {tex_file_path}")
+        except Exception as e:
+            logger.error(f"Failed to write LaTeX code to file: {e}")
+            return HttpResponse("Failed to write LaTeX code to file.", status=500)
         
         # Compile LaTeX to PDF using pdflatex
         try:
-            subprocess.run(['pdflatex', tex_file_path], cwd=temp_dir, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            pdflatex_path = shutil.which('pdflatex')
+            if not pdflatex_path:
+                logger.error("pdflatex executable not found in PATH.")
+                return HttpResponse("pdflatex executable not found. Please ensure that LaTeX is installed correctly and that 'pdflatex' is in your system's PATH.", status=500)
+            logger.debug(f"Using pdflatex at: {pdflatex_path}")
+            
+            subprocess.run(
+                [pdflatex_path, '-interaction=nonstopmode', tex_file_path],
+                cwd=temp_dir,
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                timeout=60  # Adjust as needed
+            )
+        except subprocess.TimeoutExpired:
+            logger.error("pdflatex subprocess timed out.")
+            return HttpResponse("LaTeX compilation timed out.", status=500)
         except subprocess.CalledProcessError as e:
-            return HttpResponse(f"Error compiling LaTeX: {e.stderr.decode('utf-8')}")
+            error_output = e.stderr.decode('utf-8') if e.stderr else "Unknown error."
+            logger.error(f"Error compiling LaTeX for Generation ID {generation_id}: {error_output}")
+            return HttpResponse(f"Error compiling LaTeX: {error_output}", status=500)
+        except Exception as e:
+            logger.error(f"Unexpected error during LaTeX compilation: {e}")
+            return HttpResponse(f"Unexpected error during LaTeX compilation: {e}", status=500)
         
         # Read the generated PDF
-        with open(pdf_file_path, 'rb') as pdf_file:
-            pdf_content = pdf_file.read()
+        if not os.path.exists(pdf_file_path):
+            logger.error(f"PDF file was not created for Generation ID {generation_id}.")
+            return HttpResponse("PDF file was not created.", status=500)
+        
+        try:
+            with open(pdf_file_path, 'rb') as pdf_file:
+                pdf_content = pdf_file.read()
+            logger.debug(f"Read compiled PDF content for Generation ID {generation_id}.")
+        except Exception as e:
+            logger.error(f"Failed to read compiled PDF: {e}")
+            return HttpResponse("Failed to read compiled PDF.", status=500)
     
     # Create HTTP response for file download
     response = HttpResponse(pdf_content, content_type='application/pdf')
-    response['Content-Disposition'] = f'attachment; filename="{generation.get_generation_type_display()}_{generation.id}.pdf"'
+    filename = f"{generation.get_generation_type_display()}_{generation.id}.pdf"
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
     return response
