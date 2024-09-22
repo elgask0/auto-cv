@@ -3,7 +3,7 @@
 cv_template = r"""
                     \documentclass[a4paper,9pt]{article}
                     \usepackage{hyperref}
-                    \usepackage[margin=0.75in]{geometry}
+                    \usepackage[margin=0.7in]{geometry}
                     \usepackage{enumitem}
                     \usepackage{titlesec}
 
@@ -82,7 +82,7 @@ cv_template = r"""
                     """
 
 cover_letter_template = r"""
-                    \documentclass[a4paper,12pt]{article}
+\documentclass[a4paper,12pt]{article}
 \usepackage{hyperref}
 \usepackage[margin=1in]{geometry}
 \usepackage{enumitem}
@@ -115,15 +115,15 @@ Data Solutions Inc.
 
 \textbf{Dear Hiring Manager,}
 
-I am writing to express my strong interest in the Data Analyst position at Data Solutions Inc. As a recent graduate with a Master’s degree in Data Science from New York University and a passion for turning data into impactful business decisions, I am excited about the opportunity to contribute to your team’s success.
+I am writing to express my strong interest in the Data Analyst position at Data Solutions Inc. As a recent graduate with a Master’s degree in Data Science from New York University and a passion for turning data into impactful business decisions, I am excited about the opportunity to contribute to your team’s success. \par\vspace{0.5cm}\par
 
-During my academic career, I developed a comprehensive skill set in statistical analysis, data visualization, and programming languages such as Python and SQL. I have successfully applied these skills to several real-world projects, including a predictive analytics model for customer churn that achieved an 87\% accuracy rate. My hands-on experience in analyzing complex datasets, building predictive models, and presenting data-driven insights has prepared me well for this role.
+During my academic career, I developed a comprehensive skill set in statistical analysis, data visualization, and programming languages such as Python and SQL. I have successfully applied these skills to several real-world projects, including a predictive analytics model for customer churn that achieved an 87\% accuracy rate. My hands-on experience in analyzing complex datasets, building predictive models, and presenting data-driven insights has prepared me well for this role. \par\vspace{0.5cm}\par
 
-What truly sets me apart is my ability to bridge the gap between technical data analysis and strategic business decisions. I believe that effective data analysis is not just about understanding the numbers but about transforming those numbers into a narrative that drives strategic growth. My previous internship at XYZ Corp taught me the importance of clear communication, as I worked closely with cross-functional teams to develop data-driven solutions that increased operational efficiency by 20\%. I am eager to bring this unique blend of technical expertise and business acumen to Data Solutions Inc.
+What truly sets me apart is my ability to bridge the gap between technical data analysis and strategic business decisions. I believe that effective data analysis is not just about understanding the numbers but about transforming those numbers into a narrative that drives strategic growth. My previous internship at XYZ Corp taught me the importance of clear communication, as I worked closely with cross-functional teams to develop data-driven solutions that increased operational efficiency by 20\%. I am eager to bring this unique blend of technical expertise and business acumen to Data Solutions Inc. \par\vspace{0.5cm}\par
 
-Moreover, I thrive in dynamic, fast-paced environments. My experience working on collaborative projects, such as developing a sales forecasting dashboard for a leading retail client, showcased my ability to work under pressure and meet tight deadlines without compromising on quality. I am confident that my proactive approach and problem-solving mindset will allow me to make a significant contribution to your team from day one.
+Moreover, I thrive in dynamic, fast-paced environments. My experience working on collaborative projects, such as developing a sales forecasting dashboard for a leading retail client, showcased my ability to work under pressure and meet tight deadlines without compromising on quality. I am confident that my proactive approach and problem-solving mindset will allow me to make a significant contribution to your team from day one. \par\vspace{0.5cm}\par
 
-I am genuinely excited about the prospect of joining Data Solutions Inc. and leveraging my skills to support your data-driven initiatives. I am confident that my technical skills, analytical mindset, and passion for data analysis make me a strong candidate for this role. I would welcome the opportunity to discuss how my background and qualifications align with your team’s needs in more detail.
+I am genuinely excited about the prospect of joining Data Solutions Inc. and leveraging my skills to support your data-driven initiatives. I am confident that my technical skills, analytical mindset, and passion for data analysis make me a strong candidate for this role. I would welcome the opportunity to discuss how my background and qualifications align with your team’s needs in more detail. \par\vspace{0.5cm}\par
 
 Thank you for considering my application. I look forward to the possibility of contributing to the continued success of Data Solutions Inc.
 
@@ -133,5 +133,6 @@ Thank you for considering my application. I look forward to the possibility of c
 \textbf{Jane Doe}
 
 \end{document}
+
 
                     """

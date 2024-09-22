@@ -4,7 +4,7 @@
 
 {% block content %}
 <h2>Generate Your Documents</h2>
-<form method="post">
+<form id="generation-form" method="post">
     {% csrf_token %}
     <div class="mb-3">
         {{ form.job_description.label_tag }}
@@ -21,4 +21,109 @@
     </div>
     <button type="submit" class="btn btn-primary mt-3">Generate</button>
 </form>
+
+<!-- Progress Bar Modal -->
+<div class="modal fade" id="progressModal" tabindex="-1" aria-labelledby="progressModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="progressModalLabel">Generating Documents</h5>
+      </div>
+      <div class="modal-body">
+        <div class="progress">
+          <div id="progress-bar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" 
+               style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+        </div>
+        <p class="mt-3">Please wait while your documents are being generated.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Placeholder for Generated Documents -->
+<div id="generated-documents" class="mt-4"></div>
+
+<!-- JavaScript for Handling AJAX and Progress Bar -->
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const form = document.getElementById('generation-form');
+    const progressBar = document.getElementById('progress-bar');
+    const progressModal = new bootstrap.Modal(document.getElementById('progressModal'));
+    const generatedDocumentsContainer = document.getElementById('generated-documents');
+
+    form.addEventListener('submit', function (event) {
+        event.preventDefault();
+        progressModal.show();
+        progressBar.style.width = '0%';
+        progressBar.innerText = '0%';
+
+        // Simulate progress increase
+        let progress = 0;
+        const progressInterval = setInterval(() => {
+            if (progress < 90) {
+                progress += 10;
+                progressBar.style.width = `${progress}%`;
+                progressBar.innerText = `${progress}%`;
+            }
+        }, 1000);
+
+        // Prepare the form data
+        const formData = new FormData(form);
+
+        // Send AJAX request
+        fetch("{% url 'generate_documents' %}", {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': formData.get('csrfmiddlewaretoken')
+            },
+            body: formData
+        })
+        .then(response => {
+            clearInterval(progressInterval);
+            if (!response.ok) {
+                return response.json().then(data => { throw data; });
+            }
+            return response.json();
+        })
+        .then(data => {
+            progressBar.style.width = '100%';
+            progressBar.innerText = '100%';
+            setTimeout(() => {
+                progressModal.hide();
+            }, 500);
+
+            // Display the generated documents
+            if (data.documents && data.documents.length > 0) {
+                let docsHtml = `<h3>Generated Documents</h3><ul class="list-group">`;
+                data.documents.forEach(doc => {
+                    docsHtml += `
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            ${doc.type}
+                            <span>
+                                <a href="${doc.view_url}" class="btn btn-info btn-sm me-2" target="_blank">View</a>
+                                <a href="${doc.download_url}" class="btn btn-success btn-sm">Download</a>
+                            </span>
+                        </li>
+                    `;
+                });
+                docsHtml += `</ul>`;
+                generatedDocumentsContainer.innerHTML = docsHtml;
+            } else {
+                generatedDocumentsContainer.innerHTML = `<div class="alert alert-warning">No documents were generated.</div>`;
+            }
+        })
+        .catch(errorData => {
+            clearInterval(progressInterval);
+            progressBar.style.width = '0%';
+            progressBar.innerText = 'Error';
+            progressModal.hide();
+            if (errorData.error) {
+                alert(`Error: ${errorData.error}`);
+            } else {
+                alert("An unexpected error occurred. Please try again.");
+            }
+        });
+    });
+});
+</script>
 {% endblock %}

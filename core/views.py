@@ -31,6 +31,8 @@ import os
 import base64
 from pydantic import ValidationError
 import logging
+from django.urls import reverse  # Import reverse
+from django.http import JsonResponse  # Import JsonResponse
 
 # Initialize logging
 logger = logging.getLogger(__name__)
@@ -89,6 +91,7 @@ def edit_profile(request):
         'experience_formset': experience_formset,
     }
     return render(request, 'core/edit_profile.html', context)
+
 @login_required
 def generate_documents(request):
     if request.method == 'POST':
@@ -130,9 +133,9 @@ def generate_documents(request):
                 selected_generations.append('cover_letter')
 
             if not selected_generations:
-                form.add_error(None, "Please select at least one document to generate.")
-                return render(request, 'core/generate_documents.html', {'form': form})
+                return JsonResponse({'error': "Please select at least one document to generate."}, status=400)
 
+            generated_docs = []
             for gen_type in selected_generations:
                 if gen_type == 'cv':
                     template = cv_template
@@ -162,7 +165,7 @@ def generate_documents(request):
                     latex_output = response.choices[0].message.parsed
                     
                     # Save the generation
-                    Generation.objects.create(
+                    generation = Generation.objects.create(
                         user=request.user,
                         job_description=job_description,
                         generation_type=gen_type,
@@ -171,16 +174,23 @@ def generate_documents(request):
                         json_output=latex_output.dict(),  # Convert Pydantic model to dictionary
                     )
 
+                    # Append document info for the response
+                    generated_docs.append({
+                        'type': gen_type.replace('_', ' ').title(),
+                        'view_url': reverse('render_latex', args=[generation.id]),
+                        'download_url': reverse('download_pdf', args=[generation.id])
+                    })
+
                 except ValidationError as ve:
                     logger.error(f"Pydantic validation error for {gen_type}: {ve}")
-                    form.add_error(None, f"Error validating JSON output for {gen_type}. Please try again.")
-                    return render(request, 'core/generate_documents.html', {'form': form})
+                    return JsonResponse({'error': f"Error validating JSON output for {gen_type}. Please try again."}, status=400)
                 except Exception as e:
                     logger.error(f"Error generating {gen_type}: {e}")
-                    form.add_error(None, f"Error generating {gen_type}: {e}")
-                    return render(request, 'core/generate_documents.html', {'form': form})
+                    return JsonResponse({'error': f"Error generating {gen_type}: {e}"}, status=500)
             
-            return redirect('document_list')
+            return JsonResponse({'documents': generated_docs})
+        else:
+            return JsonResponse({'error': "Invalid form data."}, status=400)
     else:
         form = GenerationForm(initial={'generate_cv': True})
     
