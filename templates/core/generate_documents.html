@@ -19,6 +19,10 @@
         {{ form.generate_cover_letter }}
         {{ form.generate_cover_letter.label_tag }}
     </div>
+    <div class="form-check">
+        {{ form.fast_mode }}
+        {{ form.fast_mode.label_tag }}
+    </div>
     <button type="submit" class="btn btn-primary mt-3">Generate</button>
 </form>
 
@@ -69,6 +73,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         // Prepare the form data
         const formData = new FormData(form);
+        const fastMode = formData.get('fast_mode') === 'on';  // Check if Fast Mode is selected
 
         // Send AJAX request
         fetch("{% url 'generate_documents' %}", {
@@ -92,22 +97,44 @@ document.addEventListener('DOMContentLoaded', function () {
                 progressModal.hide();
             }, 500);
 
-            // Display the generated documents
+            // Log the document data for debugging
+            console.log("Generated Documents Data:", data);
+
+            // Handle Fast Mode
             if (data.documents && data.documents.length > 0) {
-                let docsHtml = `<h3>Generated Documents</h3><ul class="list-group">`;
-                data.documents.forEach(doc => {
-                    docsHtml += `
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            ${doc.type}
-                            <span>
-                                <a href="${doc.view_url}" class="btn btn-info btn-sm me-2" target="_blank">View</a>
-                                <a href="${doc.download_url}" class="btn btn-success btn-sm">Download</a>
-                            </span>
-                        </li>
-                    `;
-                });
-                docsHtml += `</ul>`;
-                generatedDocumentsContainer.innerHTML = docsHtml;
+                if (fastMode) {
+                    // Automatically download all PDFs with delay
+                    let downloadDelay = 0;
+                    data.documents.forEach((doc, index) => {
+                        console.log(`Downloading document ${index + 1}:`, doc.download_url);
+                        setTimeout(() => {
+                            const link = document.createElement('a');
+                            link.href = doc.download_url;
+                            link.download = doc.filename;  // Use the filename from the response
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                        }, downloadDelay);
+                        downloadDelay += 1000; // Adding 1 second delay between downloads
+                    });
+                    generatedDocumentsContainer.innerHTML = `<div class="alert alert-success">Documents are being downloaded.</div>`;
+                } else {
+                    // Display the generated documents with View and Download buttons
+                    let docsHtml = `<h3>Generated Documents</h3><ul class="list-group">`;
+                    data.documents.forEach(doc => {
+                        docsHtml += `
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                ${doc.type}
+                                <span>
+                                    <a href="${doc.view_url}" class="btn btn-info btn-sm me-2" target="_blank">View</a>
+                                    <a href="${doc.download_url}" class="btn btn-success btn-sm">Download</a>
+                                </span>
+                            </li>
+                        `;
+                    });
+                    docsHtml += `</ul>`;
+                    generatedDocumentsContainer.innerHTML = docsHtml;
+                }
             } else {
                 generatedDocumentsContainer.innerHTML = `<div class="alert alert-warning">No documents were generated.</div>`;
             }

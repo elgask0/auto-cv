@@ -123,11 +123,18 @@ class GenerationForm(forms.Form):
     
     generate_cv = forms.BooleanField(
         required=False,
-        initial=True,
+        initial=True,  # Checked by default
         label='Generate CV'
     )
     
     generate_cover_letter = forms.BooleanField(
         required=False,
+        initial=True,  # Checked by default
         label='Generate Cover Letter'
+    )
+    
+    fast_mode = forms.BooleanField(
+        required=False,
+        initial=False,  # Unchecked by default
+        label='Fast Mode'
     )

@@ -104,9 +104,8 @@ cover_letter_template = r"""
     \href{https://www.linkedin.com/in/janedoe}{LinkedIn}
 \end{center}
 
-\vspace{0.5cm} % Vertical space between contact information and date
+\vspace{0.5cm} % Vertical space between contact information and opening
 
-September 20, 2024
 
 Hiring Manager \\
 Data Solutions Inc.

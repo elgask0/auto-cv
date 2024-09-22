@@ -1,5 +1,6 @@
 # core/views.py
 import shutil
+import re
 from openai import OpenAI
 import json
 from django.shortcuts import render, redirect, get_object_or_404
@@ -92,6 +93,16 @@ def edit_profile(request):
     }
     return render(request, 'core/edit_profile.html', context)
 
+def sanitize_filename(filename):
+    """
+    Sanitizes the filename by removing or replacing invalid characters.
+    """
+    # Replace spaces with underscores
+    filename = filename.replace(' ', '_')
+    # Remove any character that is not alphanumeric, underscore, hyphen, or dot
+    filename = re.sub(r'[^\w\-.]', '', filename)
+    return filename
+
 @login_required
 def generate_documents(request):
     if request.method == 'POST':
@@ -149,7 +160,7 @@ def generate_documents(request):
                     job_details = extract_job_details(job_description)
                     job_title = job_details.job_title
                     company = job_details.company
-                    
+
                     response = client.beta.chat.completions.parse(
                         model="gpt-4o-2024-08-06",
                         messages=[
@@ -174,11 +185,20 @@ def generate_documents(request):
                         json_output=latex_output.dict(),  # Convert Pydantic model to dictionary
                     )
 
+                    # Determine filename based on generation type
+                    if gen_type == 'cv':
+                        filename = f"CV-{user_profile.name}-{company}.pdf"
+                    elif gen_type == 'cover_letter':
+                        filename = f"COVER-LETTER-{company}.pdf"
+                    # Sanitize filename
+                    filename = sanitize_filename(filename)
+
                     # Append document info for the response
                     generated_docs.append({
                         'type': gen_type.replace('_', ' ').title(),
                         'view_url': reverse('render_latex', args=[generation.id]),
-                        'download_url': reverse('download_pdf', args=[generation.id])
+                        'download_url': reverse('download_pdf', args=[generation.id]),
+                        'filename': filename
                     })
 
                 except ValidationError as ve:
@@ -192,7 +212,8 @@ def generate_documents(request):
         else:
             return JsonResponse({'error': "Invalid form data."}, status=400)
     else:
-        form = GenerationForm(initial={'generate_cv': True})
+        # Initialize both 'generate_cv' and 'generate_cover_letter' as True by default
+        form = GenerationForm(initial={'generate_cv': True, 'generate_cover_letter': True})
     
     return render(request, 'core/generate_documents.html', {'form': form})
 
@@ -337,6 +358,107 @@ def render_latex(request, generation_id):
 
 @login_required
 def download_pdf(request, generation_id):
+    """
+    Handles the download of generated PDF documents.
+
+    Parameters:
+    - request: The HTTP request object.
+    - generation_id: The ID of the Generation instance.
+
+    Returns:
+    - HttpResponse: The PDF file as an HTTP response with the correct filename.
+    """
+    # Retrieve the Generation instance for the current user
+    generation = get_object_or_404(Generation, id=generation_id, user=request.user)
+    
+    # Extract LaTeX code from the JSON output
+    latex_code = generation.json_output.get('latex_code', '')
+    
+    if not latex_code:
+        logger.error(f"No LaTeX code found for Generation ID: {generation_id}")
+        return HttpResponse("No LaTeX code found for this document.", status=400)
+    
+    with tempfile.TemporaryDirectory() as temp_dir:
+        tex_file_path = os.path.join(temp_dir, 'document.tex')
+        pdf_file_path = os.path.join(temp_dir, 'document.pdf')
+        
+        # Write LaTeX code to .tex file
+        try:
+            with open(tex_file_path, 'w', encoding='utf-8') as tex_file:
+                tex_file.write(latex_code)
+            logger.debug(f"Wrote LaTeX code to {tex_file_path}")
+        except Exception as e:
+            logger.error(f"Failed to write LaTeX code to file: {e}")
+            return HttpResponse("Failed to write LaTeX code to file.", status=500)
+        
+        # Compile LaTeX to PDF using pdflatex
+        try:
+            pdflatex_path = shutil.which('pdflatex')
+            if not pdflatex_path:
+                logger.error("pdflatex executable not found in PATH.")
+                return HttpResponse("pdflatex executable not found. Please ensure that LaTeX is installed correctly and that 'pdflatex' is in your system's PATH.", status=500)
+            logger.debug(f"Using pdflatex at: {pdflatex_path}")
+            
+            subprocess.run(
+                [pdflatex_path, '-interaction=nonstopmode', tex_file_path],
+                cwd=temp_dir,
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                timeout=60  # Adjust as needed
+            )
+        except subprocess.TimeoutExpired:
+            logger.error("pdflatex subprocess timed out.")
+            return HttpResponse("LaTeX compilation timed out.", status=500)
+        except subprocess.CalledProcessError as e:
+            error_output = e.stderr.decode('utf-8') if e.stderr else "Unknown error."
+            logger.error(f"Error compiling LaTeX for Generation ID {generation_id}: {error_output}")
+            return HttpResponse(f"Error compiling LaTeX: {error_output}", status=500)
+        except Exception as e:
+            logger.error(f"Unexpected error during LaTeX compilation: {e}")
+            return HttpResponse(f"Unexpected error during LaTeX compilation: {e}", status=500)
+        
+        # Read the generated PDF
+        if not os.path.exists(pdf_file_path):
+            logger.error(f"PDF file was not created for Generation ID {generation_id}.")
+            return HttpResponse("PDF file was not created.", status=500)
+        
+        try:
+            with open(pdf_file_path, 'rb') as pdf_file:
+                pdf_content = pdf_file.read()
+            logger.debug(f"Read compiled PDF content for Generation ID {generation_id}.")
+        except Exception as e:
+            logger.error(f"Failed to read compiled PDF: {e}")
+            return HttpResponse("Failed to read compiled PDF.", status=500)
+    
+    # Determine the correct filename based on generation type and company
+    if generation.generation_type == 'cv':
+        name = generation.user.userprofile.name
+        company = generation.company
+        filename = f"CV-{name}-{company}.pdf"
+    elif generation.generation_type == 'cover_letter':
+        company = generation.company
+        filename = f"COVER-LETTER-{company}.pdf"
+    else:
+        filename = f"{generation.get_generation_type_display()}_{generation.id}.pdf"
+    
+    # Sanitize the filename to prevent issues
+    filename = sanitize_filename(filename)
+    
+    # Create HTTP response for file download
+    response = HttpResponse(pdf_content, content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response
+    """
+    Handles the download of generated PDF documents.
+
+    Parameters:
+    - request: The HTTP request object.
+    - generation_id: The ID of the Generation instance.
+
+    Returns:
+    - HttpResponse: The PDF file as an HTTP response with the correct filename.
+    """
     generation = get_object_or_404(Generation, id=generation_id, user=request.user)
     
     latex_code = generation.json_output.get('latex_code', '')
@@ -398,8 +520,110 @@ def download_pdf(request, generation_id):
             logger.error(f"Failed to read compiled PDF: {e}")
             return HttpResponse("Failed to read compiled PDF.", status=500)
     
+    # Determine the correct filename based on generation type and company
+    if generation.generation_type == 'cv':
+        name = generation.user.userprofile.name
+        company = generation.company
+        filename = f"CV-{name}-{company}.pdf"
+    elif generation.generation_type == 'cover_letter':
+        company = generation.company
+        filename = f"COVER-LETTER-{company}.pdf"
+    else:
+        filename = f"{generation.get_generation_type_display()}_{generation.id}.pdf"
+    
+    # Sanitize the filename to prevent issues
+    filename = sanitize_filename(filename)
+    
     # Create HTTP response for file download
     response = HttpResponse(pdf_content, content_type='application/pdf')
-    filename = f"{generation.get_generation_type_display()}_{generation.id}.pdf"
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response
+    """
+    Handles the download of generated PDF documents.
+
+    Parameters:
+    - request: The HTTP request object.
+    - generation_id: The ID of the Generation instance.
+
+    Returns:
+    - HttpResponse: The PDF file as an HTTP response with the correct filename.
+    """
+    generation = get_object_or_404(Generation, id=generation_id, user=request.user)
+    
+    latex_code = generation.json_output.get('latex_code', '')
+    
+    if not latex_code:
+        logger.error(f"No LaTeX code found for Generation ID: {generation_id}")
+        return HttpResponse("No LaTeX code found for this document.", status=400)
+    
+    with tempfile.TemporaryDirectory() as temp_dir:
+        tex_file_path = os.path.join(temp_dir, 'document.tex')
+        pdf_file_path = os.path.join(temp_dir, 'document.pdf')
+        
+        # Write LaTeX code to .tex file
+        try:
+            with open(tex_file_path, 'w', encoding='utf-8') as tex_file:
+                tex_file.write(latex_code)
+            logger.debug(f"Wrote LaTeX code to {tex_file_path}")
+        except Exception as e:
+            logger.error(f"Failed to write LaTeX code to file: {e}")
+            return HttpResponse("Failed to write LaTeX code to file.", status=500)
+        
+        # Compile LaTeX to PDF using pdflatex
+        try:
+            pdflatex_path = shutil.which('pdflatex')
+            if not pdflatex_path:
+                logger.error("pdflatex executable not found in PATH.")
+                return HttpResponse("pdflatex executable not found. Please ensure that LaTeX is installed correctly and that 'pdflatex' is in your system's PATH.", status=500)
+            logger.debug(f"Using pdflatex at: {pdflatex_path}")
+            
+            subprocess.run(
+                [pdflatex_path, '-interaction=nonstopmode', tex_file_path],
+                cwd=temp_dir,
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                timeout=60  # Adjust as needed
+            )
+        except subprocess.TimeoutExpired:
+            logger.error("pdflatex subprocess timed out.")
+            return HttpResponse("LaTeX compilation timed out.", status=500)
+        except subprocess.CalledProcessError as e:
+            error_output = e.stderr.decode('utf-8') if e.stderr else "Unknown error."
+            logger.error(f"Error compiling LaTeX for Generation ID {generation_id}: {error_output}")
+            return HttpResponse(f"Error compiling LaTeX: {error_output}", status=500)
+        except Exception as e:
+            logger.error(f"Unexpected error during LaTeX compilation: {e}")
+            return HttpResponse(f"Unexpected error during LaTeX compilation: {e}", status=500)
+        
+        # Read the generated PDF
+        if not os.path.exists(pdf_file_path):
+            logger.error(f"PDF file was not created for Generation ID {generation_id}.")
+            return HttpResponse("PDF file was not created.", status=500)
+        
+        try:
+            with open(pdf_file_path, 'rb') as pdf_file:
+                pdf_content = pdf_file.read()
+            logger.debug(f"Read compiled PDF content for Generation ID {generation_id}.")
+        except Exception as e:
+            logger.error(f"Failed to read compiled PDF: {e}")
+            return HttpResponse("Failed to read compiled PDF.", status=500)
+    
+    # Determine the correct filename based on generation type and company
+    if generation.generation_type == 'cv':
+        name = generation.user.userprofile.name
+        company = generation.company
+        filename = f"CV-{name}-{company}.pdf"
+    elif generation.generation_type == 'cover_letter':
+        company = generation.company
+        filename = f"COVER-LETTER-{company}.pdf"
+    else:
+        filename = f"{generation.get_generation_type_display()}_{generation.id}.pdf"
+    
+    # Sanitize the filename to prevent issues
+    filename = sanitize_filename(filename)
+    
+    # Create HTTP response for file download
+    response = HttpResponse(pdf_content, content_type='application/pdf')
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
     return response
