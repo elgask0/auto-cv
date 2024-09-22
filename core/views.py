@@ -30,7 +30,6 @@ import subprocess
 import tempfile
 import os
 import base64
-from pydantic import ValidationError
 import logging
 from django.urls import reverse  # Import reverse
 from django.http import JsonResponse  # Import JsonResponse
@@ -201,9 +200,6 @@ def generate_documents(request):
                         'filename': filename
                     })
 
-                except ValidationError as ve:
-                    logger.error(f"Pydantic validation error for {gen_type}: {ve}")
-                    return JsonResponse({'error': f"Error validating JSON output for {gen_type}. Please try again."}, status=400)
                 except Exception as e:
                     logger.error(f"Error generating {gen_type}: {e}")
                     return JsonResponse({'error': f"Error generating {gen_type}: {e}"}, status=500)

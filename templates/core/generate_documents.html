@@ -44,8 +44,9 @@
   </div>
 </div>
 
-<!-- Placeholder for Generated Documents -->
+<!-- Placeholder for Generated Documents and Cost Information -->
 <div id="generated-documents" class="mt-4"></div>
+<div id="cost-info" class="mt-3"></div>
 
 <!-- JavaScript for Handling AJAX and Progress Bar -->
 <script>
@@ -54,12 +55,15 @@ document.addEventListener('DOMContentLoaded', function () {
     const progressBar = document.getElementById('progress-bar');
     const progressModal = new bootstrap.Modal(document.getElementById('progressModal'));
     const generatedDocumentsContainer = document.getElementById('generated-documents');
+    const costInfoContainer = document.getElementById('cost-info');
 
     form.addEventListener('submit', function (event) {
         event.preventDefault();
         progressModal.show();
         progressBar.style.width = '0%';
         progressBar.innerText = '0%';
+        generatedDocumentsContainer.innerHTML = '';
+        costInfoContainer.innerHTML = '';
 
         // Simulate progress increase
         let progress = 0;
@@ -97,8 +101,17 @@ document.addEventListener('DOMContentLoaded', function () {
                 progressModal.hide();
             }, 500);
 
-            // Log the document data for debugging
-            console.log("Generated Documents Data:", data);
+            // Display Cost Information
+            if (data.total_tokens_used && data.cost_usd && data.cost_eur) {
+                costInfoContainer.innerHTML = `
+                    <div class="alert alert-info">
+                        <strong>Cost Summary:</strong><br>
+                        Tokens Used: ${data.total_tokens_used}<br>
+                        Cost: $${data.cost_usd} USD<br>
+                        Cost: €${data.cost_eur} EUR
+                    </div>
+                `;
+            }
 
             // Handle Fast Mode
             if (data.documents && data.documents.length > 0) {
